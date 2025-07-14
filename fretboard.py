@@ -1,283 +1,106 @@
-import sys
-import ctypes
-import os
-import subprocess
-
-freecad_bin_path = r'C:\Program Files\FreeCAD 0.20\bin'
-freecad_lib_path = r'C:\Program Files\FreeCAD 0.20\lib'
-
-# Load the required DLLs
-ctypes.CDLL(os.path.join(freecad_bin_path, 'FreeCADApp.dll'))
-ctypes.CDLL(os.path.join(freecad_bin_path, 'FreeCADBase.dll'))
-
-# Append the FreeCAD lib and bin paths to sys.path
-sys.path.append(freecad_lib_path)
-sys.path.append(freecad_bin_path)
-
-# Now import FreeCAD and Part
-import FreeCAD
-import Part
-import FreeCADGui
-
-guitar_presets = {
-    "Gibson Les Paul": {
-        "scale_length": 24.75,
-        "num_frets": 22,
-        "num_strings": 6,
-        "fingerboard_material": "Rosewood",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.695,
-        "fingerboard_width_at_12th_fret": 2.260,
-        "fingerboard_radius": 12,
-        "nut_material": "Graph Tech",
-        "inlay_material": "Acrylic",
-        "inlay_style": "Trapezoid"
-    },
-    "Fender Stratocaster": {
-        "scale_length": 25.5,
-        "num_frets": 22,
-        "num_strings": 6,
-        "fingerboard_material": "Maple",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.685,
-        "fingerboard_width_at_12th_fret": 2.165,
-        "fingerboard_radius": 9.5,
-        "nut_material": "Synthetic Bone",
-        "inlay_material": "Acrylic",
-        "inlay_style": "Dot"
-    },
-    "Fender Telecaster": {
-        "scale_length": 25.5,
-        "num_frets": 22,
-        "num_strings": 6,
-        "fingerboard_material": "Maple",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.650,
-        "fingerboard_width_at_12th_fret": 2.200,
-        "fingerboard_radius": 9.5,
-        "nut_material": "Synthetic Bone",
-        "inlay_material": "Acrylic",
-        "inlay_style": "Dot"
-    },
-    "PRS Custom 24": {
-        "scale_length": 25,
-        "num_frets": 24,
-        "num_strings": 6,
-        "fingerboard_material": "Rosewood",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.650,
-        "fingerboard_width_at_12th_fret": 2.245,
-        "fingerboard_radius": 10,
-        "nut_material": "Graph Tech",
-        "inlay_material": "Abalone",
-        "inlay_style": "Birds"
-    },
-    "Ibanez RG": {
-        "scale_length": 25.5,
-        "num_frets": 24,
-        "num_strings": 6,
-        "fingerboard_material": "Rosewood",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.692,
-        "fingerboard_width_at_12th_fret": 2.283,
-        "fingerboard_radius": 16,
-        "nut_material": "Graph Tech",
-        "inlay_material": "Acrylic",
-        "inlay_style": "Dot"
-    },
-    "Gibson ES-335": {
-        "scale_length": 24.75,
-        "num_frets": 22,
-        "num_strings": 6,
-        "fingerboard_material": "Rosewood",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.6875,
-        "fingerboard_width_at_12th_fret": 2.240,
-        "fingerboard_radius": 12,
-        "nut_material": "Bone",
-        "inlay_material": "Acrylic",
-        "inlay_style": "Dot"
-    },
-    "Rickenbacker 360": {
-        "scale_length": 24.75,
-        "num_frets": 24,
-        "num_strings": 6,
-        "fingerboard_material": "Rosewood",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.63,
-        "fingerboard_width_at_12th_fret": 1.93,
-        "fingerboard_radius": 10,
-        "nut_material": "Bone",
-        "inlay_material": "Acrylic",
-        "inlay_style": "Triangle"
-    },
-    "Martin D-28": {
-        "scale_length": 25.4,
-        "num_frets": 20,
-        "num_strings": 6,
-        "fingerboard_material": "Ebony",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.750,
-        "fingerboard_width_at_12th_fret": 2.125,
-        "fingerboard_radius": 16,
-        "nut_material": "Bone",
-        "inlay_material": "Mother of Pearl",
-        "inlay_style": "Dot"
-    },
-    "Gretsch White Falcon": {
-        "scale_length": 25.5,
-        "num_frets": 22,
-        "num_strings": 6,
-        "fingerboard_material": "Ebony",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.6875,
-        "fingerboard_width_at_12th_fret": 2.218,
-        "fingerboard_radius": 12,
-        "nut_material": "Bone",
-        "inlay_material": "Mother of Pearl",
-        "inlay_style": "Neo-Classic Thumbnail"
-    },
-    "Taylor 814ce": {
-        "scale_length": 25.5,
-        "num_frets": 20,
-        "num_strings": 6,
-        "fingerboard_material": "Ebony",
-        "fret_material": "Nickel Silver",
-        "fingerboard_width_at_nut": 1.75,
-        "fingerboard_width_at_12th_fret": 2.25,
-        "fingerboard_radius": 15,
-        "nut_material": "Tusq",
-        "inlay_material": "Mother of Pearl",
-        "inlay_style": "Element"
-    }
-}
+from fretfind import Point, Segment, Scale, calculate_fret_positions
 
 class Fretboard:
-    def __init__(self, preset=None, custom_params=None):
-        self.params = guitar_presets.get("Gibson Les Paul").copy()
-
-        if preset:
-            if preset in guitar_presets:
-                self.params.update(guitar_presets[preset])
-            else:
-                raise ValueError(f"Preset '{preset}' not found in the guitar presets.")
-
-        if custom_params:
-            self.params.update(custom_params)
+    def __init__(self,
+                 scale_length: float,
+                 num_frets: int,
+                 num_strings: int,
+                 nut_width: float,
+                 twelfth_fret_width: float,
+                 scale: Scale = None):
         
-        self._fret_positions = None
+        self.scale_length = scale_length
+        self.num_frets = num_frets
+        self.num_strings = num_strings
+        self.nut_width = nut_width
+        self.twelfth_fret_width = twelfth_fret_width
+        self.scale = scale or self.default_scale()
 
-    """
-    def __getattr__(self, attr): # possibly gratuitous access to the object params
-    if attr in self.params:
-        return self.params[attr]
-    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{attr}'")
-    """
+        self.nut_line = self._create_nut_line()
+        self.bridge_line = self._create_bridge_line()
+        self.strings = self._create_strings()
+        self.frets = self._calculate_frets()
 
-    @property
-    def fret_positions(self):
-        if self._fret_positions is None:
-            self._fret_positions = self.calculate_fret_positions()
-        return self._fret_positions
+    def default_scale(self):
+        scale = Scale()
+        scale.from_equal_temperament(12)
+        return scale
 
-    def calculate_fret_positions(self):
-        positions = []
-        for i in range(self.params['num_frets'] + 1):  # Assuming 24 frets + 1 for the nut (zero-fret)
-            distance = self.params['scale_length'] * (1 - 2 ** (-i / 12))
-            positions.append(distance)
-        return positions
+    def _create_nut_line(self):
+        y = 0
+        return Segment(
+            Point(0, y),
+            Point(self.nut_width, y)
+        )
 
-    def create_geometry(self):
-        # Create a new FreeCAD document
-        doc = FreeCAD.newDocument()
+    def _create_bridge_line(self):
+        y = self.scale_length
+        return Segment(
+            Point(0, y),
+            Point(self.twelfth_fret_width, y)  # Approximates symmetry for now
+        )
 
-        # Create a sketch for the fretboard profile
-        profile_sketch = doc.addObject("Sketcher::SketchObject", "FretboardProfile")
+    def _create_strings(self):
+        strings = []
+        for i in range(self.num_strings):
+            x_nut = self.nut_width * (i / (self.num_strings - 1))
+            x_bridge = self.twelfth_fret_width * (i / (self.num_strings - 1))
+            string = Segment(
+                Point(x_nut, 0),
+                Point(x_bridge, self.scale_length)
+            )
+            strings.append(string)
+        return strings
 
-        # Add points and lines for the fretboard profile
-        for i in range(len(self.fret_positions) - 1):
-            profile_sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(self.fret_positions[i], 0, 0),
-                                                        FreeCAD.Vector(self.fret_positions[i + 1], 0, 0)))
-            profile_sketch.addConstraint(Sketcher.Constraint("Coincident", i, 1, i + 1, 0))
+    def _calculate_frets(self):
+        """Generate fret segments per fret across all strings."""
+        fret_positions = [
+            calculate_fret_positions(self.scale, self.scale_length, self.num_frets)
+            for _ in range(self.num_strings)
+        ]
+        frets = []
 
-        # Create a sketch for the neck profile
-        profile_points = self.get_neck_profile_points()
-        neck_profile = doc.addObject("Sketcher::SketchObject", "NeckProfile")
+        for fret_idx in range(self.num_frets + 1):
+            fret_points = []
+            for string_idx, string in enumerate(self.strings):
+                pos = fret_positions[string_idx][fret_idx]
+                point = string.point_at_ratio(pos / self.scale_length)
+                fret_points.append(point)
 
-        # Add neck profile points and constraints
-        for i in range(len(profile_points) - 1):
-            neck_profile.addGeometry(Part.LineSegment(profile_points[i], profile_points[i + 1]))
-            neck_profile.addConstraint(Sketcher.Constraint("Coincident", i, 1, i + 1, 0))
+            # Join adjacent fret points into fret segments
+            fret_segments = [
+                Segment(fret_points[i], fret_points[i + 1])
+                for i in range(len(fret_points) - 1)
+            ]
+            frets.append(fret_segments)
 
-        # Loft the neck profile along the fretboard profile
-        loft = doc.addObject("Part::Loft", "Fretboard")
-        loft.Sections = [profile_sketch, neck_profile]
-        loft.Solid = True
-        loft.Ruled = True
+        return frets
 
-        # Compute the shape
-        doc.recompute()
+    def summary(self):
+        print("Fretboard geometry:")
+        print(f"  Scale length: {self.scale_length}")
+        print(f"  Frets: {self.num_frets}")
+        print(f"  Strings: {self.num_strings}")
+        print(f"  Nut width: {self.nut_width}")
+        print(f"  12th fret width: {self.twelfth_fret_width}")
+        print("\nNut:", self.nut_line)
+        print("Bridge:", self.bridge_line)
+        print("\nStrings:")
+        for idx, string in enumerate(self.strings):
+            print(f"  {idx + 1}: {string}")
+        print("\nFirst 5 frets:")
+        for i, fret_group in enumerate(self.frets[:5]):
+            print(f"Fret {i}:")
+            for seg in fret_group:
+                print(f"  {seg}")
 
-        # Create a cylindrical face radius for the fretboard
-        cylinder = doc.addObject("Part::Cylinder", "FretboardRadius")
-        cylinder.Radius = self.fretboard_radius
-        cylinder.Height = self.total_length
-        cylinder.Placement = FreeCAD.Placement(FreeCAD.Vector(0, 0, 0), FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), 0))
-
-        # Cut the loft with the cylinder to create the final fretboard shape
-        fretboard = doc.addObject("Part::Cut", "FretboardCut")
-        fretboard.Base = loft
-        fretboard.Tool = cylinder
-
-        # Compute the final shape
-        doc.recompute()
-
-        self.fretboard = fretboard
-        return fretboard
-
-    def cut_fretwire_channels(self):
-        doc = FreeCAD.ActiveDocument
-
-        # Define fretwire dimensions
-        fretwire_width = 0.8  # Modify this value as needed
-        fretwire_height = 1.5  # Modify this value as needed
-        fretwire_depth = self.fretboard_radius * 2
-
-        for i, fret_position in enumerate(self.fret_positions):
-            # Create a fretwire sketch
-            fretwire_sketch = doc.addObject("Sketcher::SketchObject", f"FretwireProfile{i}")
-
-            # Draw a rectangle for the fretwire profile
-            fretwire_sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(-fretwire_width / 2, 0, 0), FreeCAD.Vector(fretwire_width / 2, 0, 0)))
-            fretwire_sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(fretwire_width / 2, 0, 0), FreeCAD.Vector(fretwire_width / 2, fretwire_height, 0)))
-            fretwire_sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(fretwire_width / 2, fretwire_height, 0), FreeCAD.Vector(-fretwire_width / 2, fretwire_height, 0)))
-            fretwire_sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(-fretwire_width / 2, fretwire_height, 0), FreeCAD.Vector(-fretwire_width / 2, 0, 0)))
-
-            # Create the fretwire extrusion
-            fretwire = doc.addObject("Part::Extrusion", f"FretwireExtrusion{i}")
-            fretwire.Base = fretwire_sketch
-            fretwire.DirMode = "Normal"
-            fretwire.LengthFwd = fretwire_depth
-            fretwire.Solid = True
-
-            # Position the fretwire
-            fretwire.Placement = FreeCAD.Placement(FreeCAD.Vector(fret_position, 0, 0), FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), 0))
-
-            # Cut the fretwire from the fretboard
-            fretboard_cut = doc.addObject("Part::Cut", f"FretboardCut{i}")
-            fretboard_cut.Base = self.fretboard
-            fretboard_cut.Tool = fretwire
-            self.fretboard = fretboard_cut
-
-            # Update the document
-            doc.recompute()
-
-        return self.fretboard
-
-    def export_step(self, output_file_path):
-        pass
-
-fb = Fretboard()
-print(fb.fret_positions)
-fb.create_geometry()
-
+# Example usage
+if __name__ == "__main__":
+    fretboard = Fretboard(
+        scale_length=25.5,
+        num_frets=22,
+        num_strings=6,
+        nut_width=1.6875,
+        twelfth_fret_width=2.218
+    )
+    fretboard.summary()
