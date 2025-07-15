@@ -1,6 +1,46 @@
 from fretfind import Point, Segment, Scale, calculate_fret_positions
+import json
+import os
+
+# Load presets at import so other modules can easily reference them
+PRESETS_PATH = os.path.join(os.path.dirname(__file__), "presets.json")
+try:
+    with open(PRESETS_PATH, "r") as f:
+        GUITAR_PRESETS = json.load(f)
+except FileNotFoundError:
+    GUITAR_PRESETS = {}
 
 class Fretboard:
+    """Simple representation of a guitar fretboard."""
+
+    @classmethod
+    def from_preset(cls, preset_name: str, overrides: dict | None = None):
+        """Create a ``Fretboard`` from a named preset in ``GUITAR_PRESETS``.
+
+        Parameters
+        ----------
+        preset_name : str
+            Key in ``GUITAR_PRESETS``.
+        overrides : dict | None
+            Optional parameter overrides such as ``scale_length`` or ``num_frets``.
+        """
+        if preset_name not in GUITAR_PRESETS:
+            raise ValueError(f"Unknown preset: {preset_name}")
+
+        params = GUITAR_PRESETS[preset_name].copy()
+        if overrides:
+            params.update(overrides)
+
+        # Map JSON keys to constructor arguments
+        mapped = {
+            "scale_length": params.get("scale_length"),
+            "num_frets": params.get("num_frets"),
+            "num_strings": params.get("num_strings", 6),
+            "nut_width": params.get("fingerboard_width_at_nut"),
+            "twelfth_fret_width": params.get("fingerboard_width_at_12th_fret"),
+        }
+        return cls(**mapped)
+
     def __init__(self,
                  scale_length: float,
                  num_frets: int,
