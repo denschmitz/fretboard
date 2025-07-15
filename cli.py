@@ -23,21 +23,20 @@ def run_cli():
         print("Available presets:", ", ".join(presets.keys()))
         return
 
-    params = presets[args.preset]
-
-    # Override values
+    overrides = {}
     if args.frets:
-        params["num_frets"] = args.frets
+        overrides["num_frets"] = args.frets
     if args.scale:
-        params["scale_length"] = args.scale
+        overrides["scale_length"] = args.scale
+
+    params = presets[args.preset].copy()
+    params.update(overrides)
 
     if args.dry_run:
         from pprint import pprint
         pprint(params)
         return
 
-    # Generate the fretboard
-    fretboard = Fretboard(preset=args.preset, custom_params=params)
-    fretboard.create_geometry()
-    fretboard.export_step(args.output)
-    print(f"Saved STEP file to: {args.output}")
+    fretboard = Fretboard.from_preset(args.preset, overrides=overrides)
+    fretboard.summary()
+    print("(STEP export not implemented in this simplified example.)")
