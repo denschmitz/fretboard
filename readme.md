@@ -1,84 +1,42 @@
-# Fretboard Generator
+# Fretboard
 
-This project is a **parametric guitar fretboard generator** written in Python. It calculates fret positions based on musical scales and outputs geometry for use in CAD systems like **FreeCAD** or for further export as **STEP**, **SVG**, or **DXF**.
+This project is a parametric fretboard generator whose primary deliverable is a scripted STEP export path.
 
----
+The current codebase preserves:
 
-## 📐 Features
+- hand-editable guitar presets
+- fret spacing math
+- geometric construction data needed for a solid-model pipeline
 
-- Support for multiple guitar models (via `presets.json`)
-- Presets are loaded automatically at startup
-- Accurate fret placement based on scale length and tuning
-- Parametric control over fret count, string count, nut/bridge widths
-- CLI and GUI interfaces
-- Designed for CAD export (STEP, SVG, DXF planned)
-- Easily extendable for multi-scale/fanned frets
+The current codebase does not yet provide a finished STEP backend. That work is intentionally isolated behind the CAD layer so it can be implemented without reworking presets, validation, or the application interface.
 
----
+## Structure
 
-## 🗂️ Project Structure
+```text
+docs/       Design and architecture documents
+presets/    Versioned preset data
+references/ Legacy/reference assets
+src/        Application package
+tests/      Behavioral tests
+scripts/    Small helper scripts
+```
 
-fretboard-generator/
-├── guitartool.py # Entrypoint: dispatches CLI or GUI
-├── cli.py # Command-line interface
-├── gui.py # Basic Tkinter GUI
-├── fretboard.py # Main geometry engine (fretboard builder)
-├── fretfind.py # Fret position calculator (adapted from JS)
-├── presets.json # Guitar model presets
-├── README.md # This file
-└── fretfind.js # [Reference] Original JavaScript algorithm
+## Presets
 
+Presets live in `presets/presets.json` and are stored as versioned records with:
 
----
+- `id`
+- `name`
+- `units`
+- `geometry`
+- `metadata`
 
-## 🚀 Usage
+This format is intended to stay simple enough for hand editing while being strict enough to validate.
 
-### Command Line
+## UI Direction
 
-```bash
-python guitartool.py --preset "Ibanez RG" --output ibanez.step
+The legacy Tkinter GUI has been retired from the active architecture. If a UI is developed, Streamlit is the current default direction because it is easier to iterate on while the CAD pipeline is still changing.
 
-Options:
+## Reference
 
-    --preset — Name of a model in presets.json
-
-    --output — Filepath for STEP file
-
-    --frets — Override number of frets
-
-    --scale — Override scale length
-
-    --dry-run — Print settings but do not generate file
-
-GUI
-
-python guitartool.py --gui
-
-Allows selecting preset, modifying scale or frets, and saving output via a dialog.
-
-Reference Code: fretfind.js
-
-This project was originally inspired by Aaron C. Spike’s FretFind2D JavaScript code and fretfind.js is included in this repository for reference only. The Python implementation closely follows the mathematical logic of the original, while being structured for CAD and manufacturing use cases.
-
-If you’re studying how fret positions are calculated or looking to validate the math, fretfind.js is a good source of truth.
-
-## 🔧 Customizing Presets
-
-To add or modify guitar models:
-
-    Open presets.json
-
-    Add new entries using the same structure:
-    
-{
-  "Custom Model": {
-    "scale_length": 25.0,
-    "num_frets": 22,
-    "num_strings": 6,
-    "nut_material": "Bone",
-    ...
-  }
-}
-New fields added in code will fall back to Python defaults if missing from the preset.
-
-``Fretboard`` loads ``presets.json`` on start, so any changes to this file are immediately available to both the CLI and GUI tools.
+The original JavaScript fret calculation reference is kept at `references/fretfind.js`.
