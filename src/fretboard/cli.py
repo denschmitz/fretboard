@@ -13,6 +13,7 @@ from fretboard.app import (
 
 
 def add_override_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--units", choices=["in", "mm"], help="Display/input units for overrides")
     parser.add_argument("--scale-length", type=float, help="Override scale length")
     parser.add_argument("--num-frets", type=int, help="Override fret count")
     parser.add_argument("--num-strings", type=int, help="Override string count")
@@ -29,6 +30,7 @@ def add_override_arguments(parser: argparse.ArgumentParser) -> None:
 
 def extract_overrides(args: argparse.Namespace) -> dict:
     return {
+        "units": args.units,
         "scale_length": args.scale_length,
         "num_frets": args.num_frets,
         "num_strings": args.num_strings,
@@ -69,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _print_preset_list(user_path: Path | None) -> None:
     for preset in available_presets(user_path=user_path):
-        print(f"{preset.id}\t{preset.name}\t{preset.source}")
+        print(f"{preset.id}\t{preset.name}\t{preset.source}\tpreferred_display={preset.units}")
 
 
 
@@ -91,7 +93,7 @@ def main() -> None:
             user_path=args.user_presets,
             overwrite=args.overwrite,
         )
-        print(json.dumps({"saved_preset": saved.name, "id": saved.id}, indent=2))
+        print(json.dumps({"saved_preset": saved.name, "id": saved.id, "units": saved.units}, indent=2))
         return
 
     if args.save_preset_name:

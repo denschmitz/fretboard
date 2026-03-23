@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 from fretboard.errors import PresetError
+from fretboard.units import DIMENSION_FIELDS, from_internal_length, round_display, to_internal_length
 
 from .models import FretboardGeometry, FretboardMetadata, FretboardSpec, Preset
 from .validation import validate_spec
@@ -30,12 +31,30 @@ def slugify_name(value: str) -> str:
 
 
 
+def _geometry_to_internal(raw_geometry: dict, units: str) -> dict:
+    converted = raw_geometry.copy()
+    for field in DIMENSION_FIELDS:
+        if field in converted and converted[field] is not None:
+            converted[field] = to_internal_length(converted[field], units)
+    return converted
+
+
+
+def _geometry_to_display(raw_geometry: dict, units: str) -> dict:
+    converted = raw_geometry.copy()
+    for field in DIMENSION_FIELDS:
+        if field in converted and converted[field] is not None:
+            converted[field] = round_display(from_internal_length(converted[field], units))
+    return converted
+
+
+
 def spec_to_record(spec: FretboardSpec, *, preset_id: str | None = None, preset_name: str | None = None) -> dict:
     return {
         "id": preset_id or spec.id or slugify_name(spec.name),
         "name": preset_name or spec.name,
         "units": spec.units,
-        "geometry": spec.geometry.__dict__.copy(),
+        "geometry": _geometry_to_display(spec.geometry.__dict__.copy(), spec.units),
         "metadata": spec.metadata.__dict__.copy(),
     }
 
@@ -69,12 +88,13 @@ def _read_payload(path: Path, *, create_if_missing: bool = False) -> dict:
 
 def _preset_from_dict(raw: dict, *, source: str) -> Preset:
     try:
-        geometry = FretboardGeometry(**raw["geometry"])
+        units = raw["units"]
+        geometry = FretboardGeometry(**_geometry_to_internal(raw["geometry"], units))
         metadata = FretboardMetadata(**raw.get("metadata", {}))
         preset = Preset(
             id=raw["id"],
             name=raw["name"],
-            units=raw["units"],
+            units=units,
             geometry=geometry,
             metadata=metadata,
             source=source,
@@ -162,11 +182,15 @@ def build_spec_from_preset(
     units = preset.units
     name = preset.name
 
-    for key, value in (overrides or {}).items():
+    incoming = (overrides or {}).copy()
+    if incoming.get("units") is not None:
+        units = incoming["units"]
+
+    for key, value in incoming.items():
         if value is None:
             continue
         if key in geometry_data:
-            geometry_data[key] = value
+            geometry_data[key] = to_internal_length(value, units) if key in DIMENSION_FIELDS else value
         elif key in metadata_data:
             metadata_data[key] = value
         elif key == "units":

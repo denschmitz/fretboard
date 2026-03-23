@@ -4,6 +4,7 @@ from fretboard.units import SUPPORTED_UNITS
 from .models import FretboardGeometry, FretboardSpec
 
 
+
 def validate_geometry(geometry: FretboardGeometry) -> None:
     if geometry.scale_length <= 0:
         raise ValidationError("scale_length must be greater than zero")

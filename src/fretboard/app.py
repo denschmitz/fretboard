@@ -4,6 +4,7 @@ from fretboard.domain.models import FretboardSpec
 from fretboard.domain.presets import build_spec_from_preset, list_presets, save_user_preset
 from fretboard.outputs.files import write_design_output
 from fretboard.outputs.manifest import build_manifest
+from fretboard.units import DIMENSION_FIELDS, convert_dimension_dict, from_internal_length, round_display
 
 
 
@@ -28,14 +29,36 @@ def editable_fields_from_preset(
     user_path: Path | None = None,
 ) -> dict:
     spec = resolve_spec(preset, user_path=user_path)
+    geometry = {
+        field: round_display(from_internal_length(getattr(spec.geometry, field), spec.units))
+        for field in spec.geometry.__dict__
+        if field in DIMENSION_FIELDS
+    }
+    counts = {
+        field: getattr(spec.geometry, field)
+        for field in spec.geometry.__dict__
+        if field not in DIMENSION_FIELDS
+    }
     return {
         "id": spec.id,
         "source": spec.source,
         "name": spec.name,
         "units": spec.units,
-        **spec.geometry.__dict__,
+        **geometry,
+        **counts,
         **spec.metadata.__dict__,
     }
+
+
+
+def convert_display_fields(fields: dict, new_units: str) -> dict:
+    current_units = fields["units"]
+    geometry = {field: fields[field] for field in DIMENSION_FIELDS if field in fields}
+    converted = convert_dimension_dict(geometry, current_units, new_units)
+    updated = fields.copy()
+    updated.update({field: round_display(value) for field, value in converted.items()})
+    updated["units"] = new_units
+    return updated
 
 
 

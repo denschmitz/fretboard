@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fretboard.app import (
     available_presets,
+    convert_display_fields,
     editable_fields_from_preset,
     generate_output,
     resolve_spec,
@@ -10,6 +11,45 @@ from fretboard.app import (
 
 
 USER_PRESET_PATH = Path(__file__).resolve().parents[3] / "presets" / "user_presets.json"
+FIELD_KEYS = [
+    "name",
+    "units",
+    "scale_length",
+    "num_frets",
+    "num_strings",
+    "fingerboard_width_at_nut",
+    "fingerboard_width_at_12th_fret",
+    "fingerboard_radius",
+    "fingerboard_material",
+    "fret_material",
+    "nut_material",
+    "inlay_material",
+    "inlay_style",
+    "source",
+    "id",
+]
+
+
+
+def _state_key(field: str) -> str:
+    return f"fb_{field}"
+
+
+
+def _load_preset_into_state(st, preset_name: str) -> None:
+    fields = editable_fields_from_preset(preset_name, user_path=USER_PRESET_PATH)
+    for key in FIELD_KEYS:
+        st.session_state[_state_key(key)] = fields.get(key)
+    st.session_state["fb_loaded_preset"] = preset_name
+    st.session_state["fb_previous_units"] = fields["units"]
+
+
+
+def _snapshot_fields(st) -> dict:
+    return {
+        key: st.session_state.get(_state_key(key))
+        for key in FIELD_KEYS
+    }
 
 
 
@@ -26,37 +66,41 @@ def main() -> None:
 
     presets = available_presets(user_path=USER_PRESET_PATH)
     preset_names = [preset.name for preset in presets]
-    selected_name = st.selectbox("Preset", preset_names)
+    selected_name = st.selectbox("Preset", preset_names, key="fb_selected_preset")
 
-    fields = editable_fields_from_preset(selected_name, user_path=USER_PRESET_PATH)
-    st.write(f"Preset source: {fields['source']}")
+    if st.session_state.get("fb_loaded_preset") != selected_name:
+        _load_preset_into_state(st, selected_name)
 
-    with st.form("fretboard_parameters"):
-        name = st.text_input("Name", value=fields["name"])
-        units = st.selectbox("Units", ["in", "mm"], index=["in", "mm"].index(fields["units"]))
-        scale_length = st.number_input("Scale Length", value=float(fields["scale_length"]))
-        num_frets = st.number_input("Number of Frets", min_value=1, value=int(fields["num_frets"]))
-        num_strings = st.number_input("Number of Strings", min_value=2, value=int(fields["num_strings"]))
-        width_at_nut = st.number_input("Fingerboard Width At Nut", value=float(fields["fingerboard_width_at_nut"]))
-        width_at_12th_fret = st.number_input(
-            "Fingerboard Width At 12th Fret",
-            value=float(fields["fingerboard_width_at_12th_fret"]),
-        )
-        radius = st.number_input("Fingerboard Radius", value=float(fields["fingerboard_radius"]))
-        fingerboard_material = st.text_input("Fingerboard Material", value=fields.get("fingerboard_material") or "")
-        fret_material = st.text_input("Fret Material", value=fields.get("fret_material") or "")
-        nut_material = st.text_input("Nut Material", value=fields.get("nut_material") or "")
-        inlay_material = st.text_input("Inlay Material", value=fields.get("inlay_material") or "")
-        inlay_style = st.text_input("Inlay Style", value=fields.get("inlay_style") or "")
-        save_preset_name = st.text_input("Save As User Preset", value="")
-        generate_clicked = st.form_submit_button("Generate")
+    units = st.selectbox("Units", ["in", "mm"], key=_state_key("units"))
+    previous_units = st.session_state.get("fb_previous_units", units)
+    if units != previous_units:
+        converted = convert_display_fields(_snapshot_fields(st), units)
+        for field in ("scale_length", "fingerboard_width_at_nut", "fingerboard_width_at_12th_fret", "fingerboard_radius"):
+            st.session_state[_state_key(field)] = converted[field]
+        st.session_state["fb_previous_units"] = units
 
-    if not generate_clicked:
+    st.write(f"Preset source: {st.session_state.get(_state_key('source'))}")
+
+    name = st.text_input("Name", key=_state_key("name"))
+    scale_length = st.number_input("Scale Length", key=_state_key("scale_length"))
+    num_frets = st.number_input("Number of Frets", min_value=1, key=_state_key("num_frets"))
+    num_strings = st.number_input("Number of Strings", min_value=2, key=_state_key("num_strings"))
+    width_at_nut = st.number_input("Fingerboard Width At Nut", key=_state_key("fingerboard_width_at_nut"))
+    width_at_12th_fret = st.number_input("Fingerboard Width At 12th Fret", key=_state_key("fingerboard_width_at_12th_fret"))
+    radius = st.number_input("Fingerboard Radius", key=_state_key("fingerboard_radius"))
+    fingerboard_material = st.text_input("Fingerboard Material", key=_state_key("fingerboard_material"))
+    fret_material = st.text_input("Fret Material", key=_state_key("fret_material"))
+    nut_material = st.text_input("Nut Material", key=_state_key("nut_material"))
+    inlay_material = st.text_input("Inlay Material", key=_state_key("inlay_material"))
+    inlay_style = st.text_input("Inlay Style", key=_state_key("inlay_style"))
+    save_preset_name = st.text_input("Save As User Preset")
+
+    if not st.button("Generate"):
         return
 
     overrides = {
         "name": name,
-        "units": units,
+        "units": st.session_state[_state_key("units")],
         "scale_length": float(scale_length),
         "num_frets": int(num_frets),
         "num_strings": int(num_strings),
@@ -77,3 +121,6 @@ def main() -> None:
 
     output_path = generate_output(spec, output_dir=Path.cwd())
     st.success(f"Generated output: {output_path}")
+
+
+main()

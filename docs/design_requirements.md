@@ -83,6 +83,8 @@ The authoritative preset store shall be JSON with:
 
 Preset lookup may support both `id` and display name, but internal logic shall prefer the stable identifier.
 
+Preset `units` shall be interpreted as the preferred display units for that preset. Preset length values shall be converted to the project’s internal unit system during load.
+
 The system shall ship with a pick list of known guitar presets.
 
 If the project provides a graphical UI, that UI shall present presets in a dropdown or equivalent single-selection control.
@@ -95,9 +97,30 @@ The user shall also be permitted to save a modified parameter set as a user pres
 
 If user presets are stored separately, the system shall present them through the same preset selection mechanism as built-in presets.
 
-## 7. Geometric Requirements
+## 7. Units Requirements
 
-### 7.1 Coordinate Intent
+All internal geometric calculations and stored in-memory geometry values shall use millimeters.
+
+Display units are a presentation concern. They shall not change the internal unit system.
+
+If a preset declares inches as its preferred display unit, that preset's numeric length values shall be converted to millimeters on load, while the UI and user-facing summaries may still show inch values by default.
+
+If the user changes the displayed units in the UI, all displayed numeric length fields shall be converted immediately so that the values remain numerically correct in the newly selected units. This conversion shall apply to at least:
+
+- `scale_length`
+- `fingerboard_width_at_nut`
+- `fingerboard_width_at_12th_fret`
+- `fingerboard_radius`
+
+Changing display units shall not change the actual modeled geometry unless the user also edits numeric values after conversion.
+
+CLI overrides that include dimension values shall be interpreted in the units selected for that invocation. If no override units are specified, the preset's preferred display units shall be used for interpreting CLI dimension overrides.
+
+User presets shall be serialized using their chosen display units, while the running application continues to store geometry internally in millimeters.
+
+## 8. Geometric Requirements
+
+### 8.1 Coordinate Intent
 
 The project shall define a consistent geometric coordinate system for all computations and exports. At minimum:
 
@@ -106,7 +129,7 @@ The project shall define a consistent geometric coordinate system for all comput
 - Width shall be measured across the fretboard.
 - Thickness, if modeled, shall be measured normal to the fretboard’s base reference plane.
 
-### 7.2 Planform
+### 8.2 Planform
 
 The fretboard outline shall be modeled as a tapered body whose width at the nut and width at the 12th fret are controlled by input parameters.
 
@@ -114,7 +137,7 @@ Because width at the 12th fret is a required input, the system shall derive the 
 
 The project shall define how the board extends beyond the last fret and how total board length is determined. This may be an explicit input or a documented default rule, but it shall not remain implicit.
 
-### 7.3 Playing Surface Radius
+### 8.3 Playing Surface Radius
 
 The fretboard top surface shall be modeled as a radiused surface suitable for actual manufacturing geometry.
 
@@ -122,7 +145,7 @@ For the initial implementation, a cylindrical radius is acceptable and preferred
 
 The radius must exist as real 3D geometry in the exported model.
 
-### 7.4 Fret Locations and Slots
+### 8.4 Fret Locations and Slots
 
 Fret positions shall be computed from the selected scale definition and scale length.
 
@@ -137,13 +160,13 @@ At minimum, each slot definition shall include:
 - slot depth
 - slot width or cutter-equivalent width
 
-### 7.5 Inlay Direction
+### 8.5 Inlay Direction
 
 The architecture shall permit future inlay geometry without forcing a redesign of the fretboard pipeline.
 
 A future implementation may support inlays defined either parametrically or by user-supplied SVG artwork. SVG-driven inlays shall be treated as geometry input, validated before CAD operations, and cut or pocketed through the same CAD backend approach used for fret slots.
 
-## 8. Output Requirements
+## 9. Output Requirements
 
 STEP export is the primary required output.
 
@@ -156,9 +179,9 @@ A conforming implementation shall:
 
 If an external CAD tool is used as an intermediary, the automation path shall remain part of the project, not a manual undocumented side process.
 
-## 9. Implementation Requirements
+## 10. Implementation Requirements
 
-### 9.1 Acceptable Geometry Paths
+### 10.1 Acceptable Geometry Paths
 
 The following implementation strategies are acceptable:
 
@@ -169,7 +192,7 @@ The following implementation strategies are acceptable:
 
 The choice of implementation shall be driven by reliability, automation, maintainability, and output correctness rather than by preference for a purely native Python stack.
 
-### 9.2 Architecture
+### 10.2 Architecture
 
 The repository shall be organized so that these concerns are separate:
 
@@ -181,13 +204,13 @@ The repository shall be organized so that these concerns are separate:
 
 The package layout shall reflect this separation. User interfaces shall call into the package API rather than containing geometry logic directly.
 
-### 9.3 User Interface Direction
+### 10.3 User Interface Direction
 
 A desktop GUI is not required for the core product to succeed.
 
 If a UI is provided during early development, Streamlit is the preferred default because it is fast to iterate on while geometry and export behavior are still changing. A future alternative UI is acceptable if it better supports CAD-preview and file-upload workflows.
 
-### 9.4 Graphical Workflow Requirements
+### 10.4 Graphical Workflow Requirements
 
 If a graphical UI is provided, the basic user workflow shall be:
 
@@ -201,7 +224,9 @@ Generated output shall be written to the active work folder unless the implement
 
 The UI shall make it clear whether the current parameter set is a built-in preset, a modified unsaved preset, or a saved user preset.
 
-### 9.5 Command-Line Workflow Requirements
+If the UI exposes a units selector, changing that selector shall convert the displayed numeric values rather than merely changing the label.
+
+### 10.5 Command-Line Workflow Requirements
 
 The project shall provide a CLI workflow that covers the same basic behavior as the graphical workflow.
 
@@ -210,6 +235,7 @@ At minimum, the CLI shall support:
 - listing available presets
 - selecting a preset by stable id or display name
 - overriding any supported parameter through flags or an equivalent structured input mechanism
+- selecting the units used to interpret dimensional override values
 - saving the resolved parameter set as a new user preset
 - generating output without requiring a graphical interface
 
@@ -219,7 +245,7 @@ The CLI shall support a save-as operation for user presets. This may be implemen
 
 Unless an explicit output path is provided, generated files from the CLI shall be written to the current working directory.
 
-## 10. Validation Requirements
+## 11. Validation Requirements
 
 The project shall support verification of the generated model against source parameters.
 
@@ -232,10 +258,11 @@ At minimum, the implementation shall permit validation of:
 - top radius
 - presence and placement of fret slots
 - successful STEP export
+- correct conversion between internal millimeters and display units
 
 Validation may be performed through unit tests, geometric assertions, exported measurements, or CAD-side inspection tooling. The exact mechanism may vary, but the project shall not rely solely on visual confidence.
 
-## 11. Immediate Project Direction
+## 12. Immediate Project Direction
 
 The next design and implementation decisions shall be made in this order:
 
