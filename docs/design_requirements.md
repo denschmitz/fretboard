@@ -145,13 +145,29 @@ For the initial implementation, a cylindrical radius is acceptable and preferred
 
 The radius must exist as real 3D geometry in the exported model.
 
-### 8.4 Fret Locations and Slots
+### 8.4 Baseline Construction Sequence
+
+The default geometric construction sequence for the initial implementation shall be:
+
+1. Create an oversize rectangular fretboard blank rather than beginning with the final tapered outline.
+2. Form the radiused top surface on that rectangular blank using the fingerboard cylinder or an equivalent cylindrical construction.
+3. Define fret slot cutter geometry on the rectangular radiused body.
+4. Cut the fret slots before trimming the board to its final tapered outline.
+5. Trim the slotted blank to the finished trapezoidal or otherwise final planform.
+
+This sequence is the preferred baseline because it simplifies cylindrical top construction, simplifies curved fret-slot generation, and keeps fret-slot cutting independent of final edge taper.
+
+For the baseline implementation, fret slots shall be treated as full-width cuts in the pre-trim body. The final fretboard outline operation shall clip those slots to the finished fretboard edges.
+
+### 8.5 Fret Locations and Slots
 
 Fret positions shall be computed from the selected scale definition and scale length.
 
 Fret positions shall be represented in a form that can drive actual solid cuts or sketches in the CAD pipeline.
 
 Fret slots shall be cut after the fretboard body and top surface are created.
+
+For the baseline cylindrical fretboard workflow, fret slot cuts should be modeled using swept cutter geometry or an equivalent operation that preserves the fretboard crown through the slot floor.
 
 At minimum, each slot definition shall include:
 
@@ -160,7 +176,7 @@ At minimum, each slot definition shall include:
 - slot depth
 - slot width or cutter-equivalent width
 
-### 8.5 Inlay Direction
+### 8.6 Inlay Direction
 
 The architecture shall permit future inlay geometry without forcing a redesign of the fretboard pipeline.
 
@@ -259,6 +275,7 @@ At minimum, the implementation shall permit validation of:
 - presence and placement of fret slots
 - successful STEP export
 - correct conversion between internal millimeters and display units
+- correct clipping of pre-trim fret slots by the final fretboard outline
 
 Validation may be performed through unit tests, geometric assertions, exported measurements, or CAD-side inspection tooling. The exact mechanism may vary, but the project shall not rely solely on visual confidence.
 
@@ -268,9 +285,10 @@ The next design and implementation decisions shall be made in this order:
 
 1. Define the minimal authoritative fretboard parameter set required to build a real solid.
 2. Choose the CAD generation path most likely to deliver reliable scripted STEP export.
-3. Build a geometry pipeline that creates the tapered board body and radiused top surface.
-4. Add fret slot cutting as explicit solid operations.
-5. Add inlay pocketing only after the core fretboard body and slot workflow is stable.
-6. Export STEP and verify the result in an external CAD viewer.
+3. Build a geometry pipeline that creates the rectangular blank and cylindrical top surface.
+4. Add curved fret slot cutting on the pre-trim body.
+5. Trim the slotted blank to the final fretboard outline.
+6. Add inlay pocketing only after the core fretboard body and slot workflow is stable.
+7. Export STEP and verify the result in an external CAD viewer.
 
 Any existing code that does not materially support this sequence may be replaced.

@@ -12,6 +12,12 @@ from fretboard.app import (
     resolve_spec,
     save_named_user_preset,
 )
+from fretboard.cad.build123d_backend import build_fretboard_part
+from fretboard.cad.defaults import CadDefaults
+from fretboard.cad.interface import ExportRequest
+from fretboard.music.fret_positions import calculate_fret_positions
+from fretboard.music.scales import equal_temperament
+from fretboard.outputs.files import sidecar_manifest_path
 
 
 
@@ -113,18 +119,30 @@ def test_save_named_user_preset_uses_separate_user_file() -> None:
 
 
 
-def test_generate_output_defaults_to_working_directory(monkeypatch) -> None:
+def test_backend_part_extends_past_last_fret() -> None:
+    spec = resolve_spec("gibson_les_paul")
+    defaults = CadDefaults()
+    part = build_fretboard_part(ExportRequest(spec=spec, output_path=Path("unused.step")), defaults)
+    fret_positions = calculate_fret_positions(equal_temperament(), spec.geometry.scale_length, spec.geometry.num_frets)
+    assert part.bounding_box().max.Y > fret_positions[-1]
+
+
+
+def test_generate_output_creates_step_and_manifest_in_work_folder() -> None:
     temp_dir = _make_workspace_temp_dir()
     try:
-        monkeypatch.chdir(temp_dir)
         spec = resolve_spec("gibson_les_paul")
-
-        output_path = generate_output(spec)
+        output_path = generate_output(spec, work_folder=temp_dir)
+        manifest_path = sidecar_manifest_path(output_path)
 
         assert output_path.parent == temp_dir
+        assert output_path.suffix == ".step"
         assert output_path.exists()
-        payload = json.loads(output_path.read_text())
+        assert manifest_path.exists()
+
+        payload = json.loads(manifest_path.read_text())
         assert payload["output_type"] == "fretboard_design_manifest"
+        assert payload["step_file"] == str(output_path)
         assert payload["spec"]["name"] == "Gibson Les Paul"
         assert payload["spec"]["units"] == "in"
         assert payload["spec"]["internal_units"] == "mm"

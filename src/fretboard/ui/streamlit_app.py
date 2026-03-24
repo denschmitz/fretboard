@@ -6,6 +6,7 @@ from fretboard.app import (
     editable_fields_from_preset,
     generate_output,
     resolve_spec,
+    resolved_work_folder,
     save_named_user_preset,
 )
 
@@ -80,6 +81,7 @@ def main() -> None:
         st.session_state["fb_previous_units"] = units
 
     st.write(f"Preset source: {st.session_state.get(_state_key('source'))}")
+    st.write(f"Work folder: {resolved_work_folder()}")
 
     name = st.text_input("Name", key=_state_key("name"))
     scale_length = st.number_input("Scale Length", key=_state_key("scale_length"))
@@ -119,7 +121,7 @@ def main() -> None:
         save_named_user_preset(spec, save_preset_name.strip(), user_path=USER_PRESET_PATH, overwrite=True)
         st.success(f"Saved user preset: {save_preset_name.strip()}")
 
-    output_path = generate_output(spec, output_dir=Path.cwd())
+    output_path = generate_output(spec, work_folder=resolved_work_folder())
     st.success(f"Generated output: {output_path}")
 
 

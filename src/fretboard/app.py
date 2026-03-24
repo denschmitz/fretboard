@@ -1,8 +1,10 @@
 from pathlib import Path
 
+from fretboard.cad.interface import ExportRequest
+from fretboard.cad.step_export import StepExportBackend
 from fretboard.domain.models import FretboardSpec
 from fretboard.domain.presets import build_spec_from_preset, list_presets, save_user_preset
-from fretboard.outputs.files import write_design_output
+from fretboard.outputs.files import default_step_output_path, resolve_work_folder, write_design_output
 from fretboard.outputs.manifest import build_manifest
 from fretboard.units import DIMENSION_FIELDS, convert_dimension_dict, from_internal_length, round_display
 
@@ -95,7 +97,16 @@ def generate_output(
     spec: FretboardSpec,
     *,
     output_path: Path | None = None,
-    output_dir: Path | None = None,
+    work_folder: Path | None = None,
 ) -> Path:
+    step_path = output_path or default_step_output_path(spec, work_folder)
+    backend = StepExportBackend()
+    backend.export_step(ExportRequest(spec=spec, output_path=step_path))
     summary = build_design_summary(spec)
-    return write_design_output(summary, spec, output_path=output_path, output_dir=output_dir)
+    write_design_output(summary, step_path)
+    return step_path
+
+
+
+def resolved_work_folder(work_folder: Path | None = None) -> Path:
+    return resolve_work_folder(work_folder)

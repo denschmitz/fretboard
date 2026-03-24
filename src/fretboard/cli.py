@@ -7,6 +7,7 @@ from fretboard.app import (
     build_design_summary,
     generate_output,
     resolve_spec,
+    resolved_work_folder,
     save_named_user_preset,
 )
 
@@ -61,7 +62,8 @@ def build_parser() -> argparse.ArgumentParser:
     generate_parser.add_argument("--user-presets", type=Path, help="Path to user presets JSON")
     generate_parser.add_argument("--save-preset-name", help="Save resolved values as a new user preset before generation")
     generate_parser.add_argument("--overwrite", action="store_true", help="Overwrite matching user preset")
-    generate_parser.add_argument("--output", type=Path, help="Explicit output file path")
+    generate_parser.add_argument("--output", type=Path, help="Explicit STEP output file path")
+    generate_parser.add_argument("--work-folder", type=Path, help="Folder for generated artifacts")
     generate_parser.add_argument("--dry-run", action="store_true", help="Print resolved design data and skip file generation")
     add_override_arguments(generate_parser)
 
@@ -110,8 +112,9 @@ def main() -> None:
         print(json.dumps(summary, indent=2))
         return
 
-    output_path = generate_output(spec, output_path=args.output)
-    print(json.dumps({"output": str(output_path), "summary": summary}, indent=2))
+    work_folder = resolved_work_folder(args.work_folder)
+    output_path = generate_output(spec, output_path=args.output, work_folder=work_folder)
+    print(json.dumps({"output": str(output_path), "work_folder": str(work_folder), "summary": summary}, indent=2))
 
 
 if __name__ == "__main__":

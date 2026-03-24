@@ -1,8 +1,12 @@
 import json
+import os
 import re
 from pathlib import Path
 
 from fretboard.domain.models import FretboardSpec
+
+
+WORK_FOLDER_ENV = "FRETBOARD_WORK_FOLDER"
 
 
 
@@ -12,24 +16,35 @@ def _slugify_filename(value: str) -> str:
 
 
 
-def default_output_path(spec: FretboardSpec, output_dir: Path | None = None) -> Path:
-    directory = output_dir or Path.cwd()
-    filename = f"{_slugify_filename(spec.name)}.fretboard.json"
+def resolve_work_folder(work_folder: Path | None = None) -> Path:
+    if work_folder is not None:
+        resolved = work_folder
+    else:
+        env_value = os.environ.get(WORK_FOLDER_ENV)
+        resolved = Path(env_value) if env_value else Path.cwd()
+    resolved.mkdir(parents=True, exist_ok=True)
+    return resolved
+
+
+
+def default_step_output_path(spec: FretboardSpec, work_folder: Path | None = None) -> Path:
+    directory = resolve_work_folder(work_folder)
+    filename = f"{_slugify_filename(spec.name)}.step"
     return directory / filename
 
 
 
-def write_design_output(
-    summary: dict,
-    spec: FretboardSpec,
-    *,
-    output_path: Path | None = None,
-    output_dir: Path | None = None,
-) -> Path:
-    target_path = output_path or default_output_path(spec, output_dir)
+def sidecar_manifest_path(step_path: Path) -> Path:
+    return step_path.with_suffix(".fretboard.json")
+
+
+
+def write_design_output(summary: dict, step_path: Path) -> Path:
+    target_path = sidecar_manifest_path(step_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "output_type": "fretboard_design_manifest",
+        "step_file": str(step_path),
         "spec": summary,
     }
     target_path.write_text(json.dumps(payload, indent=2) + "\n")

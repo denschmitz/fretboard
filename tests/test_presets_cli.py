@@ -72,14 +72,14 @@ def test_cli_save_preset_command(capsys, monkeypatch) -> None:
 
 
 
-def test_cli_generate_writes_output_to_current_directory_and_can_save_user_preset(
+def test_cli_generate_writes_step_to_selected_work_folder_and_can_save_user_preset(
     capsys,
     monkeypatch,
 ) -> None:
     temp_dir = _make_workspace_temp_dir()
     try:
+        work_folder = temp_dir / "artifacts"
         user_path = temp_dir / "user_presets.json"
-        monkeypatch.chdir(temp_dir)
         monkeypatch.setattr(
             "sys.argv",
             [
@@ -97,6 +97,8 @@ def test_cli_generate_writes_output_to_current_directory_and_can_save_user_prese
                 "Stage LP",
                 "--user-presets",
                 str(user_path),
+                "--work-folder",
+                str(work_folder),
             ],
         )
 
@@ -104,8 +106,9 @@ def test_cli_generate_writes_output_to_current_directory_and_can_save_user_prese
 
         out = json.loads(capsys.readouterr().out)
         output_path = Path(out["output"])
-        assert output_path.parent == temp_dir
+        assert output_path.parent == work_folder
         assert output_path.exists()
+        assert output_path.suffix == ".step"
         assert out["summary"]["name"] == "Stage LP"
         assert out["summary"]["units"] == "mm"
         assert out["summary"]["geometry"]["num_frets"] == 24
@@ -120,24 +123,44 @@ def test_cli_generate_writes_output_to_current_directory_and_can_save_user_prese
 def test_streamlit_module_executes_main(monkeypatch) -> None:
     calls: list[tuple[str, object]] = []
 
-    class FakeForm:
-        def __enter__(self):
-            return self
+    class FakeStreamlit:
+        def __init__(self):
+            self.session_state = {}
 
-        def __exit__(self, exc_type, exc, tb):
+        def title(self, value):
+            calls.append(("title", value))
+
+        def caption(self, value):
+            calls.append(("caption", value))
+
+        def selectbox(self, label, options, key=None, index=0):
+            value = options[index]
+            if key is not None:
+                self.session_state[key] = value
+            return value
+
+        def write(self, value):
+            calls.append(("write", value))
+
+        def text_input(self, label, key=None):
+            if key is not None:
+                self.session_state.setdefault(key, "")
+                return self.session_state[key]
+            return ""
+
+        def number_input(self, label, key=None, min_value=None):
+            if key is not None:
+                self.session_state.setdefault(key, 0)
+                return self.session_state[key]
+            return 0
+
+        def button(self, label):
             return False
 
-    fake_streamlit = types.SimpleNamespace(
-        session_state={},
-        title=lambda value: calls.append(("title", value)),
-        caption=lambda value: calls.append(("caption", value)),
-        selectbox=lambda label, options, key=None, index=0: options[index],
-        write=lambda value: calls.append(("write", value)),
-        text_input=lambda label, key=None: "",
-        number_input=lambda label, key=None, min_value=None: 0,
-        button=lambda label: False,
-        success=lambda value: calls.append(("success", value)),
-    )
+        def success(self, value):
+            calls.append(("success", value))
+
+    fake_streamlit = FakeStreamlit()
 
     import sys
     import importlib
