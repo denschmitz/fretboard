@@ -8,7 +8,9 @@ from fretboard.app import (
     available_presets,
     convert_display_fields,
     editable_fields_from_preset,
+    export_named_preset,
     generate_output,
+    import_preset_file,
     resolve_spec,
     save_named_user_preset,
 )
@@ -114,6 +116,36 @@ def test_save_named_user_preset_uses_separate_user_file() -> None:
         assert payload["presets"][0]["name"] == "My Custom LP"
         assert payload["presets"][0]["units"] == "mm"
         assert payload["presets"][0]["geometry"]["scale_length"] == 635.0
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+
+def test_exported_preset_can_be_edited_imported_and_resolved_by_name() -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        export_path = temp_dir / "exported.json"
+        user_path = temp_dir / "user_presets.json"
+
+        export_named_preset("gibson_les_paul", export_path)
+        payload = json.loads(export_path.read_text())
+        assert payload["name"] == "Gibson Les Paul"
+        assert payload["metadata"]["fingerboard_material"] == "Rosewood"
+
+        payload["name"] = "Imported LP"
+        payload["id"] = "imported_lp"
+        payload["units"] = "mm"
+        payload["geometry"]["scale_length"] = 635.0
+        export_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+        imported = import_preset_file(export_path, user_path=user_path)
+        resolved = resolve_spec("Imported LP", user_path=user_path)
+
+        assert imported.name == "Imported LP"
+        assert imported.id == "imported_lp"
+        assert resolved.id == "imported_lp"
+        assert resolved.units == "mm"
+        assert math.isclose(resolved.geometry.scale_length, 635.0, rel_tol=0, abs_tol=1e-6)
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 

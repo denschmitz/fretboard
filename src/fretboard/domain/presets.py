@@ -62,6 +62,18 @@ def spec_to_record(spec: FretboardSpec, *, preset_id: str | None = None, preset_
 
 
 
+def preset_to_spec(preset: Preset) -> FretboardSpec:
+    return FretboardSpec(
+        id=preset.id,
+        name=preset.name,
+        units=preset.units,
+        geometry=preset.geometry,
+        metadata=preset.metadata,
+        source=preset.source,
+    )
+
+
+
 def _read_payload(path: Path, *, create_if_missing: bool = False) -> dict:
     if not path.exists():
         if not create_if_missing:
@@ -93,7 +105,7 @@ def _preset_from_dict(raw: dict, *, source: str) -> Preset:
     try:
         units = raw["units"]
         geometry = FretboardGeometry(**_geometry_to_internal(raw["geometry"], units))
-        metadata = FretboardMetadata(**raw.get("metadata", {}))
+        metadata = FretboardMetadata(**raw["metadata"])
         preset = Preset(
             id=raw["id"],
             name=raw["name"],
@@ -107,16 +119,7 @@ def _preset_from_dict(raw: dict, *, source: str) -> Preset:
     except TypeError as exc:
         raise PresetError(f"Invalid preset shape: {exc}") from exc
 
-    validate_spec(
-        FretboardSpec(
-            id=preset.id,
-            name=preset.name,
-            units=preset.units,
-            geometry=preset.geometry,
-            metadata=preset.metadata,
-            source=preset.source,
-        )
-    )
+    validate_spec(preset_to_spec(preset))
     return preset
 
 
@@ -222,22 +225,54 @@ def build_spec_from_preset(
 
 
 
+def export_preset(
+    identifier: str,
+    path: Path,
+    *,
+    include_user: bool = True,
+    user_path: Path | None = None,
+) -> Path:
+    preset = get_preset(identifier, include_user=include_user, user_path=user_path)
+    record = spec_to_record(preset_to_spec(preset), preset_id=preset.id, preset_name=preset.name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record, indent=2) + "\n")
+    logger.info("Exported preset %s to %s", identifier, path)
+    return path
+
+
+
+def load_single_preset(path: Path) -> Preset:
+    try:
+        raw = json.loads(path.read_text())
+    except FileNotFoundError as exc:
+        raise PresetError(f"Preset file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise PresetError(f"Preset file is not valid JSON: {exc}") from exc
+
+    if not isinstance(raw, dict):
+        raise PresetError("Standalone preset file must contain a single preset object")
+
+    return _preset_from_dict(raw, source="user")
+
+
+
 def save_user_preset(
     spec: FretboardSpec,
     preset_name: str,
     *,
     user_path: Path | None = None,
     overwrite: bool = False,
+    preset_id: str | None = None,
 ) -> Preset:
     target_path = user_path or default_user_presets_path()
     payload = _read_payload(target_path, create_if_missing=True)
-    preset_id = slugify_name(preset_name)
-    record = spec_to_record(spec, preset_id=preset_id, preset_name=preset_name)
+    resolved_preset_id = preset_id or slugify_name(preset_name)
+    record = spec_to_record(spec, preset_id=resolved_preset_id, preset_name=preset_name)
 
     existing = payload["presets"]
     existing_index = None
     for index, raw in enumerate(existing):
-        if raw.get("id") == preset_id or raw.get("name") == preset_name:
+        if raw.get("id") == resolved_preset_id or raw.get("name") == preset_name:
             existing_index = index
             break
 
@@ -253,3 +288,20 @@ def save_user_preset(
     target_path.write_text(json.dumps(payload, indent=2) + "\n")
     logger.info("Saved user preset %s to %s", preset_name, target_path)
     return _preset_from_dict(record, source="user")
+
+
+
+def import_user_preset(
+    path: Path,
+    *,
+    user_path: Path | None = None,
+    overwrite: bool = False,
+) -> Preset:
+    preset = load_single_preset(path)
+    return save_user_preset(
+        preset_to_spec(preset),
+        preset.name,
+        user_path=user_path,
+        overwrite=overwrite,
+        preset_id=preset.id,
+    )

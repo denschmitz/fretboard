@@ -3,7 +3,13 @@ from pathlib import Path
 from fretboard.cad.interface import ExportRequest
 from fretboard.cad.step_export import StepExportBackend
 from fretboard.domain.models import FretboardSpec
-from fretboard.domain.presets import build_spec_from_preset, list_presets, save_user_preset
+from fretboard.domain.presets import (
+    build_spec_from_preset,
+    export_preset,
+    import_user_preset,
+    list_presets,
+    save_user_preset,
+)
 from fretboard.logging_utils import get_logger
 from fretboard.outputs.files import default_step_output_path, resolve_work_folder, write_design_output
 from fretboard.outputs.manifest import build_manifest
@@ -95,6 +101,28 @@ def save_named_user_preset(
     renamed_spec = rename_spec(spec, preset_name)
     logger.info("Saving user preset %s", preset_name)
     return save_user_preset(renamed_spec, preset_name, user_path=user_path, overwrite=overwrite)
+
+
+
+def export_named_preset(
+    preset: str,
+    output_path: Path,
+    *,
+    user_path: Path | None = None,
+) -> Path:
+    logger.info("Exporting preset %s", preset)
+    return export_preset(preset, output_path, user_path=user_path)
+
+
+
+def import_preset_file(
+    preset_path: Path,
+    *,
+    user_path: Path | None = None,
+    overwrite: bool = False,
+):
+    logger.info("Importing preset from %s", preset_path)
+    return import_user_preset(preset_path, user_path=user_path, overwrite=overwrite)
 
 
 

@@ -14,11 +14,11 @@ This document defines the currently supported, testable requirements for the pro
 - `FR-008` Changing display units shall convert the displayed length fields while preserving the same modeled geometry.
 - `FR-009` CLI dimensional overrides shall be interpreted in the units selected for that invocation. If override units are omitted, the preset's preferred display units shall be used.
 - `FR-010` User presets shall be stored in a separate JSON file, shall preserve the selected display units when serialized, and shall appear in the same preset listing flow as built-in presets.
-- `FR-011` Work-folder resolution shall prefer an explicit `--work-folder` path, then `FRETBOARD_WORK_FOLDER`, then the current working directory.
+- `FR-011` Output location resolution shall prefer an explicit `--output` file path, then an explicit `--work-folder` path, then `FRETBOARD_WORK_FOLDER`, then the current working directory.
 - `FR-012` The fretboard taper shall be derived from the nut width and the 12th-fret width, and the width at half scale length shall equal the specified 12th-fret width.
 - `FR-013` The default board-length rule shall extend the board beyond the last fret by the configured CAD default end extension.
 - `FR-014` Slot definitions shall include slot position, slot orientation, slot depth, and slot width for every fret.
-- `FR-015` The CLI shall support listing presets, saving a user preset, and generating output without requiring the graphical UI.
+- `FR-015` The CLI shall support listing presets, exporting a preset, importing a preset, saving a user preset, and generating output without requiring the graphical UI.
 - `FR-016` If the Streamlit UI is provided, it shall separate preset selection and preset status from editable input controls using distinct visual sections.
 - `FR-017` The UI shall group editable inputs into at least two sections: core geometry inputs and secondary metadata inputs.
 - `FR-018` The core geometry section shall expose the minimum design-driving inputs without requiring the user to scan through metadata fields first.
@@ -29,6 +29,13 @@ This document defines the currently supported, testable requirements for the pro
 - `FR-023` The UI shall allow the user to save the current parameter set as a user preset without mixing that action into the primary geometry-editing section.
 - `FR-024` Musical scale utilities shall support equal-temperament scales and alternate explicit scale definitions for fret-position calculations.
 - `FR-025` The application shall provide a centralized logging configuration that supports the standard Python `DEBUG`, `INFO`, `WARNING`, and `ERROR` levels through configuration inputs.
+- `FR-026` The CLI shall export any built-in or user preset to a standalone JSON file representing a single guitar preset that can be edited outside the application.
+- `FR-027` The CLI shall import a standalone preset JSON file into the user preset store, preserving its display units and making it available in subsequent preset listings and generation flows.
+- `FR-028` Presets imported into the user preset store shall be selectable by name in subsequent CLI runs using the same lookup flow as built-in presets.
+- `FR-029` The CLI preset listing command shall print all available preset names to the console, including both built-in and user presets.
+- `FR-030` The CLI generate command shall accept an explicit output file path and filename for the generated STEP file. When provided, that path shall take precedence over work-folder-based output location.
+- `FR-031` The system shall define a standalone JSON format for an individual preset export/import file, including the fields required to recreate a preset in the user preset store.
+- `FR-032` Imported preset JSON files shall be validated for required preset fields and rejected with a clear error if invalid.
 
 ## Advisory Notes
 

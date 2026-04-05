@@ -15,7 +15,9 @@ from fretboard.app import (
     available_presets,
     convert_display_fields,
     editable_fields_from_preset,
+    export_named_preset,
     generate_output,
+    import_preset_file,
     resolve_spec,
     save_named_user_preset,
 )
@@ -23,7 +25,7 @@ from fretboard.cad.build123d_backend import _board_length_mm
 from fretboard.cad.defaults import CadDefaults
 from fretboard.cad.interface import ExportRequest
 from fretboard.domain.presets import PRESET_FILE_VERSION, default_presets_path
-from fretboard.errors import ValidationError
+from fretboard.errors import PresetError, ValidationError
 from fretboard.geometry.outline import width_at_distance
 from fretboard.geometry.slots import fret_slot_centerlines
 from fretboard.logging_utils import configure_logging, normalize_log_level
@@ -175,18 +177,38 @@ def test_fr_010_user_presets_are_separate_serialized_in_display_units_and_listed
 
 
 
-def test_fr_011_work_folder_resolution_precedence(monkeypatch) -> None:
+def test_fr_011_output_location_resolution_precedence(capsys, monkeypatch) -> None:
     temp_dir = _make_workspace_temp_dir()
     try:
         cwd_path = temp_dir / "cwd"
         env_path = temp_dir / "env"
-        explicit_path = temp_dir / "explicit"
+        explicit_work_folder = temp_dir / "explicit"
+        explicit_output = temp_dir / "named" / "chosen.step"
         cwd_path.mkdir()
         monkeypatch.chdir(cwd_path)
         monkeypatch.setenv(WORK_FOLDER_ENV, str(env_path))
 
         assert resolve_work_folder() == env_path
-        assert resolve_work_folder(explicit_path) == explicit_path
+        assert resolve_work_folder(explicit_work_folder) == explicit_work_folder
+
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "fretboard",
+                "generate",
+                "--preset",
+                "gibson_les_paul",
+                "--work-folder",
+                str(explicit_work_folder),
+                "--output",
+                str(explicit_output),
+            ],
+        )
+        cli.main()
+        output = json.loads(capsys.readouterr().out)
+        assert Path(output["output"]) == explicit_output
+        assert output["work_folder"] == str(explicit_output.parent)
 
         monkeypatch.delenv(WORK_FOLDER_ENV)
         assert resolve_work_folder() == cwd_path
@@ -230,14 +252,50 @@ def test_fr_014_slot_definitions_include_required_cut_fields() -> None:
 
 
 
-def test_fr_015_cli_supports_list_save_and_generate_without_ui(capsys, monkeypatch) -> None:
+def test_fr_015_cli_supports_list_export_import_save_and_generate_without_ui(capsys, monkeypatch) -> None:
     temp_dir = _make_workspace_temp_dir()
     try:
         user_path = temp_dir / "user_presets.json"
+        export_path = temp_dir / "gibson_les_paul.json"
 
         monkeypatch.setattr(sys, "argv", ["fretboard", "list-presets"])
         cli.main()
-        assert "gibson_les_paul" in capsys.readouterr().out
+        assert "Gibson Les Paul" in capsys.readouterr().out
+
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "fretboard",
+                "export-preset",
+                "--preset",
+                "gibson_les_paul",
+                "--output",
+                str(export_path),
+            ],
+        )
+        cli.main()
+        capsys.readouterr()
+        assert export_path.exists()
+        exported = json.loads(export_path.read_text())
+        exported["name"] = "Stage LP Imported"
+        exported["id"] = "stage_lp_imported"
+        export_path.write_text(json.dumps(exported, indent=2) + "\n")
+
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "fretboard",
+                "import-preset",
+                "--input",
+                str(export_path),
+                "--user-presets",
+                str(user_path),
+            ],
+        )
+        cli.main()
+        assert json.loads(capsys.readouterr().out)["imported_preset"] == "Stage LP Imported"
 
         monkeypatch.setattr(
             sys,
@@ -264,7 +322,7 @@ def test_fr_015_cli_supports_list_save_and_generate_without_ui(capsys, monkeypat
                 "fretboard",
                 "generate",
                 "--preset",
-                "Gibson Les Paul",
+                "Stage LP Imported",
                 "--user-presets",
                 str(user_path),
             ],
@@ -518,3 +576,136 @@ def test_fr_025_logging_supports_standard_levels_and_cli_configuration(monkeypat
     assert logging.getLogger().level == logging.DEBUG
 
 
+
+
+
+def test_fr_026_cli_exports_standalone_single_preset_json() -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        export_path = temp_dir / "exported.json"
+        export_named_preset("gibson_les_paul", export_path)
+        payload = json.loads(export_path.read_text())
+
+        assert payload["id"] == "gibson_les_paul"
+        assert payload["name"] == "Gibson Les Paul"
+        assert payload["units"] == "in"
+        assert "geometry" in payload
+        assert "metadata" in payload
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_fr_027_cli_imports_standalone_preset_into_user_store() -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        export_path = temp_dir / "import_me.json"
+        user_path = temp_dir / "user_presets.json"
+        export_named_preset("gibson_les_paul", export_path)
+        payload = json.loads(export_path.read_text())
+        payload["name"] = "Imported Workshop LP"
+        payload["id"] = "imported_workshop_lp"
+        payload["units"] = "mm"
+        payload["geometry"]["scale_length"] = 635.0
+        export_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+        imported = import_preset_file(export_path, user_path=user_path)
+        store = json.loads(user_path.read_text())
+
+        assert imported.name == "Imported Workshop LP"
+        assert store["presets"][0]["name"] == "Imported Workshop LP"
+        assert store["presets"][0]["units"] == "mm"
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_fr_028_imported_presets_are_selectable_by_name() -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        export_path = temp_dir / "import_me.json"
+        user_path = temp_dir / "user_presets.json"
+        export_named_preset("gibson_les_paul", export_path)
+        payload = json.loads(export_path.read_text())
+        payload["name"] = "Imported Name Lookup"
+        payload["id"] = "imported_name_lookup"
+        export_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+        import_preset_file(export_path, user_path=user_path)
+        resolved = resolve_spec("Imported Name Lookup", user_path=user_path)
+
+        assert resolved.id == "imported_name_lookup"
+        assert resolved.name == "Imported Name Lookup"
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_fr_029_cli_lists_all_available_preset_names(capsys, monkeypatch) -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        export_path = temp_dir / "import_me.json"
+        user_path = temp_dir / "user_presets.json"
+        export_named_preset("gibson_les_paul", export_path)
+        payload = json.loads(export_path.read_text())
+        payload["name"] = "Listed Imported LP"
+        payload["id"] = "listed_imported_lp"
+        export_path.write_text(json.dumps(payload, indent=2) + "\n")
+        import_preset_file(export_path, user_path=user_path)
+
+        monkeypatch.setattr(sys, "argv", ["fretboard", "list-presets", "--user-presets", str(user_path)])
+        cli.main()
+        lines = [line.strip() for line in capsys.readouterr().out.splitlines() if line.strip()]
+
+        assert "Gibson Les Paul" in lines
+        assert "Listed Imported LP" in lines
+        assert all("\t" not in line for line in lines)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_fr_030_cli_generate_accepts_explicit_output_file_path(capsys, monkeypatch) -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        output_path = temp_dir / "named" / "custom.step"
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "fretboard",
+                "generate",
+                "--preset",
+                "gibson_les_paul",
+                "--output",
+                str(output_path),
+            ],
+        )
+        cli.main()
+        payload = json.loads(capsys.readouterr().out)
+
+        assert Path(payload["output"]) == output_path
+        assert output_path.exists()
+        assert payload["work_folder"] == str(output_path.parent)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_fr_031_standalone_preset_json_contains_recreation_fields() -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        export_path = temp_dir / "exported.json"
+        export_named_preset("gibson_les_paul", export_path)
+        payload = json.loads(export_path.read_text())
+
+        assert set(payload) == {"id", "name", "units", "geometry", "metadata"}
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_fr_032_imported_preset_json_is_validated() -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        invalid_path = temp_dir / "invalid.json"
+        invalid_path.write_text(json.dumps({"name": "Broken"}, indent=2) + "\n")
+
+        with pytest.raises(PresetError):
+            import_preset_file(invalid_path, user_path=temp_dir / "user_presets.json")
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

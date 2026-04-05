@@ -28,12 +28,12 @@ def test_equal_temperament_starts_at_zero() -> None:
 
 
 
-def test_cli_lists_presets(capsys, monkeypatch) -> None:
+def test_cli_lists_preset_names(capsys, monkeypatch) -> None:
     monkeypatch.setattr("sys.argv", ["fretboard", "list-presets"])
     cli.main()
-    out = capsys.readouterr().out
-    assert "gibson_les_paul" in out
-    assert "preferred_display=in" in out
+    out_lines = [line.strip() for line in capsys.readouterr().out.splitlines() if line.strip()]
+    assert "Gibson Les Paul" in out_lines
+    assert all("	" not in line for line in out_lines)
 
 
 
@@ -72,14 +72,85 @@ def test_cli_save_preset_command(capsys, monkeypatch) -> None:
 
 
 
-def test_cli_generate_writes_step_to_selected_work_folder_and_can_save_user_preset(
-    capsys,
-    monkeypatch,
-) -> None:
+def test_cli_exports_imports_and_lists_user_presets(capsys, monkeypatch) -> None:
     temp_dir = _make_workspace_temp_dir()
     try:
-        work_folder = temp_dir / "artifacts"
+        export_path = temp_dir / "gibson_lp.json"
         user_path = temp_dir / "user_presets.json"
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "fretboard",
+                "export-preset",
+                "--preset",
+                "gibson_les_paul",
+                "--output",
+                str(export_path),
+            ],
+        )
+        cli.main()
+        capsys.readouterr()
+        exported = json.loads(export_path.read_text())
+        exported["name"] = "Workshop LP Imported"
+        exported["id"] = "workshop_lp_imported"
+        exported["geometry"]["scale_length"] = 25.0
+        export_path.write_text(json.dumps(exported, indent=2) + "\n")
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "fretboard",
+                "import-preset",
+                "--input",
+                str(export_path),
+                "--user-presets",
+                str(user_path),
+            ],
+        )
+        cli.main()
+        out = json.loads(capsys.readouterr().out)
+        assert out["imported_preset"] == "Workshop LP Imported"
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "fretboard",
+                "list-presets",
+                "--user-presets",
+                str(user_path),
+            ],
+        )
+        cli.main()
+        out_lines = [line.strip() for line in capsys.readouterr().out.splitlines() if line.strip()]
+        assert "Workshop LP Imported" in out_lines
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "fretboard",
+                "generate",
+                "--preset",
+                "Workshop LP Imported",
+                "--user-presets",
+                str(user_path),
+                "--output",
+                str(temp_dir / "custom-output.step"),
+            ],
+        )
+        cli.main()
+        generated = json.loads(capsys.readouterr().out)
+        assert Path(generated["output"]).name == "custom-output.step"
+        assert Path(generated["output"]).exists()
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+
+def test_cli_generate_writes_step_to_explicit_output_path(capsys, monkeypatch) -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        output_path = temp_dir / "named-output.step"
         monkeypatch.setattr(
             "sys.argv",
             [
@@ -93,28 +164,21 @@ def test_cli_generate_writes_step_to_selected_work_folder_and_can_save_user_pres
                 "24",
                 "--scale-length",
                 "635.0",
-                "--save-preset-name",
-                "Stage LP",
-                "--user-presets",
-                str(user_path),
-                "--work-folder",
-                str(work_folder),
+                "--output",
+                str(output_path),
             ],
         )
 
         cli.main()
 
         out = json.loads(capsys.readouterr().out)
-        output_path = Path(out["output"])
-        assert output_path.parent == work_folder
+        assert Path(out["output"]) == output_path
         assert output_path.exists()
-        assert output_path.suffix == ".step"
-        assert out["summary"]["name"] == "Stage LP"
+        assert out["work_folder"] == str(temp_dir)
+        assert out["summary"]["name"] == "Gibson Les Paul"
         assert out["summary"]["units"] == "mm"
         assert out["summary"]["geometry"]["num_frets"] == 24
         assert out["summary"]["geometry"]["scale_length"] == 635.0
-        payload = json.loads(user_path.read_text())
-        assert payload["presets"][0]["name"] == "Stage LP"
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -132,6 +196,9 @@ def test_streamlit_module_executes_main(monkeypatch) -> None:
 
         def caption(self, value):
             calls.append(("caption", value))
+
+        def subheader(self, value):
+            calls.append(("subheader", value))
 
         def selectbox(self, label, options, key=None, index=0):
             value = options[index]
