@@ -4,6 +4,8 @@ Fretboard is a parametric guitar fretboard generator focused on producing a scri
 
 The current project generates a real STEP model, writes output artifacts to a work folder, supports built-in and user presets, and exposes both a CLI workflow and a Streamlit UI.
 
+![Example Gibson Les Paul fretboard render](docs/images/gibson_les_paul_v1.png)
+
 ## Current Capabilities
 
 - Versioned JSON presets with built-in and user-defined entries
