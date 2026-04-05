@@ -4,6 +4,8 @@ Fretboard is a parametric guitar fretboard generator focused on producing a scri
 
 The current project generates a real STEP model, writes output artifacts to a work folder, supports built-in and user presets, and exposes both a CLI workflow and a Streamlit UI.
 
+The project is at `1.0 alpha`. Exported STEP files still require human-in-the-loop visual validation until an automated geometry-validation method is in place.
+
 ![Example Gibson Les Paul fretboard render](docs/images/gibson_les_paul_v1.png)
 
 ## Quick Start
@@ -29,6 +31,7 @@ That setup makes the package importable from the repo checkout, keeps the enviro
 - Internal geometric calculations in millimeters with user-facing inch or millimeter display units
 - Preset-driven parameter editing with save-as user preset support
 - Scripted STEP generation through a `build123d` backend
+- Dot inlay recess generation with alpha fallback from non-dot preset styles
 - Sidecar JSON manifest written alongside each generated STEP file
 - Streamlit UI for preset selection, parameter editing, unit switching, and generation
 - CLI commands for listing presets, saving user presets, and generating output
@@ -65,6 +68,8 @@ The generator writes:
 
 - a `.step` file for the fretboard solid
 - a `.fretboard.json` sidecar manifest with the resolved parameters and summary data
+
+STEP output is not yet considered self-validating. For `1.0 alpha`, exported geometry should still be reviewed by a human before being treated as manufacturing-ready.
 
 By default, output is written to the active work folder.
 
@@ -143,7 +148,10 @@ The baseline modeling sequence is:
 2. form the cylindrical fretboard crown on that blank
 3. cut fret slots on the pre-trim body
 4. trim the slotted blank to the final tapered outline
-5. export the result to STEP
+5. cut dot inlay recesses into the fretboard top face
+6. export the result to STEP
+
+For `1.0 alpha`, any preset `inlay_style` currently resolves to the dot inlay path during CAD generation.
 
 This matches the current design direction documented in [design_requirements.md](C:/Data/dev/fretboard/docs/design_requirements.md).
 

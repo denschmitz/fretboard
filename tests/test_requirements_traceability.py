@@ -21,11 +21,13 @@ from fretboard.app import (
     resolve_spec,
     save_named_user_preset,
 )
-from fretboard.cad.build123d_backend import _board_length_mm
+from fretboard.cad import build123d_backend
+from fretboard.cad.build123d_backend import _board_length_mm, _build_dot_inlay_profile, _extrude_inlay_profile, build_inlay_cut_parts
 from fretboard.cad.defaults import CadDefaults
 from fretboard.cad.interface import ExportRequest
 from fretboard.domain.presets import PRESET_FILE_VERSION, default_presets_path
 from fretboard.errors import PresetError, ValidationError
+from fretboard.geometry.inlays import inlay_recesses, marker_center_y, resolved_inlay_style
 from fretboard.geometry.outline import width_at_distance
 from fretboard.geometry.slots import fret_slot_centerlines
 from fretboard.logging_utils import configure_logging, normalize_log_level
@@ -709,3 +711,102 @@ def test_fr_032_imported_preset_json_is_validated() -> None:
             import_preset_file(invalid_path, user_path=temp_dir / "user_presets.json")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+
+def test_fr_033_inlay_recesses_are_generated_at_standard_marker_positions() -> None:
+    spec = resolve_spec("gibson_les_paul")
+    recesses = inlay_recesses(spec)
+    positions = calculate_fret_positions(equal_temperament(), spec.geometry.scale_length, spec.geometry.num_frets)
+    expected_marker_frets = [3, 5, 7, 9, 12, 15, 17, 19, 21]
+
+    assert sorted(set(recess.fret_number for recess in recesses)) == expected_marker_frets
+
+    for fret_number in expected_marker_frets:
+        expected_y = marker_center_y(positions, fret_number)
+        marker_recesses = [recess for recess in recesses if recess.fret_number == fret_number]
+
+        assert marker_recesses
+        assert all(math.isclose(recess.center_y, expected_y, rel_tol=0, abs_tol=1e-6) for recess in marker_recesses)
+
+
+def test_fr_034_non_dot_inlay_styles_fall_back_to_dot_geometry() -> None:
+    gibson_spec = resolve_spec("gibson_les_paul")
+    prs_spec = resolve_spec("prs_custom_24")
+
+    assert resolved_inlay_style("Dot") == "dot"
+    assert resolved_inlay_style("Trapezoid") == "dot"
+    assert resolved_inlay_style("Birds") == "dot"
+    assert all(recess.style == "dot" for recess in inlay_recesses(gibson_spec))
+    assert all(recess.style == "dot" for recess in inlay_recesses(prs_spec))
+
+
+def test_fr_035_single_dot_markers_share_one_diameter() -> None:
+    spec = resolve_spec("fender_stratocaster")
+    recesses = [recess for recess in inlay_recesses(spec) if recess.fret_number != 12]
+
+    assert recesses
+    assert {recess.diameter for recess in recesses} == {CadDefaults().inlay_dot_diameter_mm}
+
+
+def test_fr_036_octave_marker_uses_two_matching_dots() -> None:
+    spec = resolve_spec("fender_stratocaster")
+    octave_recesses = [recess for recess in inlay_recesses(spec) if recess.fret_number == 12]
+
+    assert len(octave_recesses) == 2
+    assert math.isclose(octave_recesses[0].diameter, octave_recesses[1].diameter, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(octave_recesses[0].center_y, octave_recesses[1].center_y, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(octave_recesses[0].center_x, -octave_recesses[1].center_x, rel_tol=0, abs_tol=1e-6)
+
+
+def test_fr_037_inlay_cad_uses_circle_profile_and_subtractive_extrusion() -> None:
+    defaults = CadDefaults()
+    spec = resolve_spec("fender_stratocaster")
+    profile = _build_dot_inlay_profile(defaults.inlay_dot_diameter_mm)
+    cut = _extrude_inlay_profile(profile, inlay_recesses(spec)[0], defaults.fingerboard_thickness_mm)
+    bbox = cut.bounding_box()
+
+    assert math.isclose(bbox.max.X - bbox.min.X, defaults.inlay_dot_diameter_mm, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(bbox.max.Y - bbox.min.Y, defaults.inlay_dot_diameter_mm, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(bbox.max.Z, defaults.fingerboard_thickness_mm, rel_tol=0, abs_tol=1e-6)
+
+
+def test_fr_038_inlay_depth_is_five_mm_at_crown_apex() -> None:
+    defaults = CadDefaults()
+    spec = resolve_spec("fender_stratocaster")
+    profile = _build_dot_inlay_profile(defaults.inlay_dot_diameter_mm)
+    cut = _extrude_inlay_profile(profile, inlay_recesses(spec)[0], defaults.fingerboard_thickness_mm)
+    bbox = cut.bounding_box()
+
+    assert math.isclose(bbox.max.Z - bbox.min.Z, defaults.inlay_depth_mm, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(bbox.min.Z, defaults.fingerboard_thickness_mm - defaults.inlay_depth_mm, rel_tol=0, abs_tol=1e-6)
+
+
+def test_fr_039_inlay_profile_creation_is_separate_from_extrusion(monkeypatch) -> None:
+    request = ExportRequest(spec=resolve_spec("gibson_les_paul"), output_path=Path("unused.step"))
+    defaults = CadDefaults()
+    calls: list[tuple] = []
+
+    def fake_profile_builder(diameter):
+        calls.append(("profile", diameter))
+        return f"profile-{diameter}"
+
+    def fake_resolver(style):
+        calls.append(("resolve", style))
+        return fake_profile_builder
+
+    def fake_extrude(profile, recess, top_surface_z):
+        calls.append(("extrude", profile, recess.fret_number, top_surface_z))
+        return (profile, recess.fret_number)
+
+    monkeypatch.setattr(build123d_backend, "_resolve_inlay_profile_builder", fake_resolver)
+    monkeypatch.setattr(build123d_backend, "_extrude_inlay_profile", fake_extrude)
+
+    cut_parts = build_inlay_cut_parts(request, defaults, top_surface_z=defaults.fingerboard_thickness_mm)
+
+    assert cut_parts
+    assert calls[0] == ("resolve", "Trapezoid")
+    profile_calls = [call for call in calls if call[0] == "profile"]
+    extrude_calls = [call for call in calls if call[0] == "extrude"]
+    assert len(profile_calls) == len(extrude_calls) == len(cut_parts)
+    assert all(call[1].startswith("profile-") for call in extrude_calls)

@@ -36,6 +36,13 @@ This document defines the currently supported, testable requirements for the pro
 - `FR-030` The CLI generate command shall accept an explicit output file path and filename for the generated STEP file. When provided, that path shall take precedence over work-folder-based output location.
 - `FR-031` The system shall define a standalone JSON format for an individual preset export/import file, including the fields required to recreate a preset in the user preset store.
 - `FR-032` Imported preset JSON files shall be validated for required preset fields and rejected with a clear error if invalid.
+- `FR-033` The system shall generate inlay recess geometry at the standard fretboard marker positions for presets whose metadata includes any inlay style value.
+- `FR-034` The alpha inlay implementation shall resolve every supported or unsupported preset inlay style value to the dot inlay geometry path for CAD generation.
+- `FR-035` Dot inlays shall use a single shared diameter for all non-octave markers within a generated fretboard.
+- `FR-036` The octave marker position shall use two dot inlays of the same diameter as the single-dot markers.
+- `FR-037` The CAD backend shall create dot inlay recesses by generating a 2D circle profile and applying a subtractive extrusion into the fretboard top face.
+- `FR-038` The inlay cutting depth target shall be 5.0 millimeters measured at the apex of the curved fretboard top surface; deeper material removal away from the apex due to surface curvature is acceptable.
+- `FR-039` The CAD implementation shall separate inlay profile creation from the subtractive extrusion operation so alternate inlay shapes can be introduced without replacing the extrusion workflow.
 
 ## Advisory Notes
 
@@ -43,5 +50,6 @@ These statements guide design decisions but are not treated as requirements for 
 
 - Geometry and export correctness take priority over UI polish.
 - Presets are convenience inputs rather than the architectural center of the system.
-- Future inlay support remains a valid extension point, but it is not part of the current required scope.
+- Future custom inlay shape support, such as SVG-driven profiles, remains a valid extension point beyond the alpha dot implementation.
+- For `1.0 alpha`, exported STEP geometry still requires human-in-the-loop validation because an automated STEP-geometry verification method has not yet been defined.
 - Manual CAD inspection is still useful for qualitative review, but it does not replace automated verification.

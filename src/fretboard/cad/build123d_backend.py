@@ -1,9 +1,23 @@
 from pathlib import Path
 
-from build123d import Align, Box, BuildSketch, Cylinder, Polygon, Pos, Rotation, export_step, extrude
+from build123d import (
+    Align,
+    Box,
+    BuildSketch,
+    Circle,
+    Cylinder,
+    Location,
+    Polygon,
+    Pos,
+    Rotation,
+    Vector,
+    export_step,
+    extrude,
+)
 
 from fretboard.cad.defaults import CadDefaults
 from fretboard.cad.interface import CadBackend, ExportRequest
+from fretboard.geometry.inlays import InlayRecess, inlay_recesses, resolved_inlay_style
 from fretboard.geometry.outline import width_at_distance
 from fretboard.logging_utils import get_logger
 from fretboard.music.fret_positions import calculate_fret_positions
@@ -20,10 +34,8 @@ def _board_length_mm(request: ExportRequest, defaults: CadDefaults) -> float:
     return fret_positions[-1] + defaults.end_extension_mm
 
 
-
 def _final_width_mm(request: ExportRequest, board_length_mm: float) -> float:
     return width_at_distance(request.spec, board_length_mm)
-
 
 
 def _rectangular_blank_width_mm(final_width_mm: float, defaults: CadDefaults, request: ExportRequest) -> float:
@@ -31,7 +43,6 @@ def _rectangular_blank_width_mm(final_width_mm: float, defaults: CadDefaults, re
         request.spec.geometry.fingerboard_width_at_nut,
         final_width_mm,
     ) + (2 * defaults.rectangular_side_margin_mm)
-
 
 
 def _build_trim_prism(nut_width_mm: float, final_width_mm: float, board_length_mm: float, thickness_mm: float):
@@ -44,6 +55,50 @@ def _build_trim_prism(nut_width_mm: float, final_width_mm: float, board_length_m
         )
     return Pos(0, board_length_mm / 2, 0) * extrude(outline.sketch, amount=thickness_mm)
 
+
+def _build_dot_inlay_profile(diameter_mm: float):
+    with BuildSketch() as profile:
+        Circle(diameter_mm / 2)
+    return profile.sketch
+
+
+def _resolve_inlay_profile_builder(style: str | None):
+    normalized_style = resolved_inlay_style(style)
+    if normalized_style == "dot":
+        return _build_dot_inlay_profile
+    return None
+
+
+def _extrude_inlay_profile(profile, recess: InlayRecess, top_surface_z: float):
+    placed_profile = profile.moved(Location(Vector(recess.center_x, recess.center_y, top_surface_z)))
+    return extrude(placed_profile, amount=-recess.depth)
+
+
+def build_inlay_cut_parts(
+    request: ExportRequest,
+    defaults: CadDefaults,
+    *,
+    top_surface_z: float | None = None,
+):
+    profile_builder = _resolve_inlay_profile_builder(request.spec.metadata.inlay_style)
+    if profile_builder is None:
+        return []
+
+    recesses = inlay_recesses(
+        request.spec,
+        dot_diameter=defaults.inlay_dot_diameter_mm,
+        cut_depth=defaults.inlay_depth_mm,
+        octave_pair_offset_ratio=defaults.inlay_octave_pair_offset_ratio,
+    )
+    top_surface_z = defaults.fingerboard_thickness_mm if top_surface_z is None else top_surface_z
+
+    cut_parts = []
+    for recess in recesses:
+        profile = profile_builder(recess.diameter)
+        cut_parts.append(_extrude_inlay_profile(profile, recess, top_surface_z))
+
+    logger.debug("Built %s inlay recess cutters for %s", len(cut_parts), request.spec.name)
+    return cut_parts
 
 
 def build_fretboard_part(request: ExportRequest, defaults: CadDefaults | None = None):
@@ -101,8 +156,13 @@ def build_fretboard_part(request: ExportRequest, defaults: CadDefaults | None = 
         board_length_mm,
         thickness_mm,
     )
+    fretboard = slotted_blank & trim_prism
+
+    for inlay_cutter in build_inlay_cut_parts(request, defaults, top_surface_z=thickness_mm):
+        fretboard = fretboard - inlay_cutter
+
     logger.debug("Built fretboard part length=%s width=%s thickness=%s", board_length_mm, final_width_mm, thickness_mm)
-    return slotted_blank & trim_prism
+    return fretboard
 
 
 class Build123dStepBackend(CadBackend):

@@ -9,3 +9,6 @@ class CadDefaults:
     end_extension_mm: float = 12.0
     rectangular_side_margin_mm: float = 2.0
     cylinder_length_margin_mm: float = 4.0
+    inlay_dot_diameter_mm: float = 6.0
+    inlay_depth_mm: float = 5.0
+    inlay_octave_pair_offset_ratio: float = 0.18

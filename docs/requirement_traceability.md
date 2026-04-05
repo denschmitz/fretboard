@@ -25,3 +25,18 @@
 - `FR-023`: `tests/test_requirements_traceability.py::test_fr_023_streamlit_ui_saves_user_preset_from_separate_section`
 - `FR-024`: `tests/test_requirements_traceability.py::test_fr_024_scale_utilities_support_equal_temperament_and_explicit_scales`
 - `FR-025`: `tests/test_requirements_traceability.py::test_fr_025_logging_supports_standard_levels_and_cli_configuration`
+
+- `FR-026`: `tests/test_requirements_traceability.py::test_fr_026_cli_exports_standalone_single_preset_json`
+- `FR-027`: `tests/test_requirements_traceability.py::test_fr_027_cli_imports_standalone_preset_into_user_store`
+- `FR-028`: `tests/test_requirements_traceability.py::test_fr_028_imported_presets_are_selectable_by_name`
+- `FR-029`: `tests/test_requirements_traceability.py::test_fr_029_cli_lists_all_available_preset_names`
+- `FR-030`: `tests/test_requirements_traceability.py::test_fr_030_cli_generate_accepts_explicit_output_file_path`
+- `FR-031`: `tests/test_requirements_traceability.py::test_fr_031_standalone_preset_json_contains_recreation_fields`
+- `FR-032`: `tests/test_requirements_traceability.py::test_fr_032_imported_preset_json_is_validated`
+- `FR-033`: `tests/test_requirements_traceability.py::test_fr_033_inlay_recesses_are_generated_at_standard_marker_positions`
+- `FR-034`: `tests/test_requirements_traceability.py::test_fr_034_non_dot_inlay_styles_fall_back_to_dot_geometry`
+- `FR-035`: `tests/test_requirements_traceability.py::test_fr_035_single_dot_markers_share_one_diameter`
+- `FR-036`: `tests/test_requirements_traceability.py::test_fr_036_octave_marker_uses_two_matching_dots`
+- `FR-037`: `tests/test_requirements_traceability.py::test_fr_037_inlay_cad_uses_circle_profile_and_subtractive_extrusion`
+- `FR-038`: `tests/test_requirements_traceability.py::test_fr_038_inlay_depth_is_five_mm_at_crown_apex`
+- `FR-039`: `tests/test_requirements_traceability.py::test_fr_039_inlay_profile_creation_is_separate_from_extrusion`
