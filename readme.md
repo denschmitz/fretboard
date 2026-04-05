@@ -6,7 +6,7 @@ The current project generates a real STEP model, writes output artifacts to a wo
 
 The project is at `1.0 alpha`. Exported STEP files still require human-in-the-loop visual validation until an automated geometry-validation method is in place.
 
-![Example Gibson Les Paul fretboard render](docs/images/gibson_les_paul v1.png)
+![Example Gibson Les Paul fretboard render](docs/images/gibson_les_paul%20v1.png)
 
 ## Quick Start
 
