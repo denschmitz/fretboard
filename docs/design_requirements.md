@@ -44,6 +44,29 @@ This document defines the currently supported, testable requirements for the pro
 - `FR-038` The inlay cutting depth target shall be 5.0 millimeters measured at the apex of the curved fretboard top surface; deeper material removal away from the apex due to surface curvature is acceptable.
 - `FR-039` The CAD implementation shall separate inlay profile creation from the subtractive extrusion operation so alternate inlay shapes can be introduced without replacing the extrusion workflow.
 
+- `FR-040` The system shall support custom inlay profiles sourced from SVG geometry files.
+- `FR-041` A custom inlay SVG shall be interpreted as 2D profile geometry only; fill color, stroke color, stroke width, text, filters, masks, clipping paths, gradients, and raster images shall not affect CAD generation.
+- `FR-042` A custom inlay SVG shall use millimeters as its authored geometric units.
+- `FR-043` The SVG coordinate origin `(0,0)` shall represent the intended placement center of the inlay on the fretboard unless an explicit placement override is introduced by a future requirement.
+- `FR-044` The CAD backend shall place an imported SVG profile such that the SVG origin coincides with the resolved inlay center point for that marker location.
+- `FR-045` A custom inlay SVG shall contain at least one closed outer boundary curve.
+- `FR-046` A custom inlay SVG may contain one or more closed internal island boundaries representing voids within the inlay profile.
+- `FR-047` All SVG boundary curves used for CAD generation shall be closed, non-zero-area, and coplanar in the SVG 2D plane.
+- `FR-048` Open curves, zero-length segments, and zero-area closed loops shall be rejected during SVG validation.
+- `FR-049` Self-intersecting SVG boundaries shall be rejected during SVG validation.
+- `FR-050` Nested closed SVG boundaries shall be interpreted using a hole rule in which enclosed inner boundaries subtract area from their containing outer boundary.
+- `FR-051` The system shall support multiple disjoint outer boundaries within a single SVG so one asset can define a multi-region inlay profile.
+- `FR-052` The CAD backend shall ignore unsupported non-geometry SVG content and shall reject the asset if no valid profile geometry remains after filtering.
+- `FR-053` The system shall define and document the supported SVG geometry element types for CAD import.
+- `FR-054` For `1.0 alpha`, supported SVG geometry elements shall be limited to a constrained subset sufficient for deterministic CAD import.
+- `FR-055` If SVG transforms are unsupported for `1.0 alpha`, the importer shall reject transformed geometry during validation with a clear error message.
+- `FR-056` The CAD implementation shall convert validated SVG inlay profiles into the same profile-to-extrusion workflow used by native inlay geometry generation.
+- `FR-057` SVG-derived inlay profiles shall use the same inlay depth rules as non-SVG inlay generation unless explicitly overridden by a future requirement.
+- `FR-058` The CAD backend shall preserve internal voids and disjoint closed regions when generating the final cutter solid from an SVG-derived profile.
+- `FR-059` Validation failures for custom inlay SVG assets shall identify the offending asset and the reason validation failed.
+- `FR-060` If a custom inlay SVG asset fails validation during load, the system shall substitute the corresponding marker with the fallback dot inlay geometry so generation can continue.
+- `FR-061` When a custom inlay SVG asset fails validation and a fallback dot inlay is substituted, the system shall emit a warning-level log message identifying the affected asset and marker location.
+- `FR-062` If SVG validation failures result in a generated artifact that does not match the requested custom inlay geometry, the system shall emit an error-level log message indicating that the output artifact is degraded and requires review.
 ## Advisory Notes
 
 These statements guide design decisions but are not treated as requirements for test coverage:
@@ -53,3 +76,4 @@ These statements guide design decisions but are not treated as requirements for 
 - Future custom inlay shape support, such as SVG-driven profiles, remains a valid extension point beyond the alpha dot implementation.
 - For `1.0 alpha`, exported STEP geometry still requires human-in-the-loop validation because an automated STEP-geometry verification method has not yet been defined.
 - Manual CAD inspection is still useful for qualitative review, but it does not replace automated verification.
+
