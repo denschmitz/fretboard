@@ -1,294 +1,40 @@
 # Design Requirements
 
-## 1. Purpose
-
-This project shall generate a parametric guitar fretboard model and export that model as a valid STEP file suitable for downstream CAD, CAM, and fabrication workflows.
-
-The project is not primarily a visualization tool, a preset browser, or a fret-spacing calculator in isolation. Its purpose is to transform a defined set of fretboard parameters into manufacturable 3D geometry.
-
-The generated model shall represent an actual fretboard blank, not merely a 2D reference drawing. Fret locations shall be computed accurately from the musical scale definition, and the resulting 3D solid shall support typical guitar-building use cases such as review in CAD, fixture design, CNC preparation, and dimensional verification.
-
-## 2. Product Definition
-
-The system shall produce a 3D fretboard body with the following essential characteristics:
-
-- A tapered planform from nut end to body end.
-- A radiused playing surface derived from a cylindrical surface or an equivalent mathematically identical construction.
-- Fret slot centerlines positioned according to the selected scale and fret count.
-- Fret slot cuts applied after the primary fretboard surface and body geometry are established.
-- Export of the final geometry to STEP format.
-
-The system may additionally emit secondary outputs such as debug drawings, 2D construction data, SVG, DXF, or intermediate CAD scripts. These are subordinate outputs and shall not replace STEP generation as the primary deliverable.
-
-## 3. Design Philosophy
-
-The project shall be designed from the output backward.
-
-The controlling question for every major implementation decision shall be: does this improve the project’s ability to produce a correct and usable STEP model of a fretboard?
-
-Accordingly:
-
-- Geometry generation shall take precedence over UI concerns.
-- CAD kernel compatibility shall take precedence over preserving old code structure.
-- Rewriting existing modules is acceptable when required to produce a clearer and more reliable geometry pipeline.
-- Presets are convenience input data, not the architectural center of the system.
-- Future inlay support shall be treated as an extension of the geometry pipeline, not as an isolated decoration feature.
-
-## 4. Primary Use Case
-
-The primary use case is:
-
-1. A user specifies a fretboard design using either a preset, direct parameter entry, or both.
-2. The system computes fret locations and board dimensions from those inputs.
-3. The system constructs a 3D fretboard solid using a CAD-capable geometry path.
-4. The system cuts fret slots into that solid.
-5. The system exports the resulting model to a STEP file.
-
-If the project supports both direct Python geometry generation and generation through an external CAD intermediary such as Fusion 360 or FreeCAD, either approach is acceptable provided the resulting process is deterministic, scriptable, and produces a valid STEP output.
-
-## 5. Required Inputs
-
-The following parameters are required design inputs because they define the minimum viable fretboard:
-
-- `scale_length`
-- `num_frets`
-- `num_strings`
-- `fingerboard_width_at_nut`
-- `fingerboard_width_at_12th_fret`
-- `fingerboard_radius`
-
-The system shall preserve support for explicit scale definitions, including equal temperament and alternate scales.
-
-The following attributes may be retained as metadata unless and until they drive geometry:
-
-- `fingerboard_material`
-- `fret_material`
-- `nut_material`
-- `inlay_material`
-- `inlay_style`
-
-## 6. Preset Requirements
-
-Preset data shall remain simple enough for hand editing.
-
-The authoritative preset store shall be JSON with:
-
-- a top-level file version
-- a list of preset objects
-- a stable machine-readable `id`
-- a human-readable `name`
-- explicit `units`
-- a `geometry` object for model-driving values
-- a `metadata` object for descriptive fields
-
-Preset lookup may support both `id` and display name, but internal logic shall prefer the stable identifier.
-
-Preset `units` shall be interpreted as the preferred display units for that preset. Preset length values shall be converted to the project’s internal unit system during load.
-
-The system shall ship with a pick list of known guitar presets.
-
-If the project provides a graphical UI, that UI shall present presets in a dropdown or equivalent single-selection control.
-
-Selecting a preset shall preload all available fretboard parameter fields from the selected preset into the editable parameter form.
-
-After a preset is loaded, the user shall be permitted to change any parameter value before generation.
-
-The user shall also be permitted to save a modified parameter set as a user preset by supplying a new preset name. This save-as behavior may write to the main preset store or to a separate user preset file. The implementation choice shall favor clarity, low risk of accidental overwrite, and ease of hand editing.
-
-If user presets are stored separately, the system shall present them through the same preset selection mechanism as built-in presets.
-
-## 7. Units Requirements
-
-All internal geometric calculations and stored in-memory geometry values shall use millimeters.
-
-Display units are a presentation concern. They shall not change the internal unit system.
-
-If a preset declares inches as its preferred display unit, that preset's numeric length values shall be converted to millimeters on load, while the UI and user-facing summaries may still show inch values by default.
-
-If the user changes the displayed units in the UI, all displayed numeric length fields shall be converted immediately so that the values remain numerically correct in the newly selected units. This conversion shall apply to at least:
-
-- `scale_length`
-- `fingerboard_width_at_nut`
-- `fingerboard_width_at_12th_fret`
-- `fingerboard_radius`
-
-Changing display units shall not change the actual modeled geometry unless the user also edits numeric values after conversion.
-
-CLI overrides that include dimension values shall be interpreted in the units selected for that invocation. If no override units are specified, the preset's preferred display units shall be used for interpreting CLI dimension overrides.
-
-User presets shall be serialized using their chosen display units, while the running application continues to store geometry internally in millimeters.
-
-## 8. Geometric Requirements
-
-### 8.1 Coordinate Intent
-
-The project shall define a consistent geometric coordinate system for all computations and exports. At minimum:
-
-- The nut end shall be the reference end of the board.
-- Longitudinal position shall increase from nut toward bridge or board end.
-- Width shall be measured across the fretboard.
-- Thickness, if modeled, shall be measured normal to the fretboard’s base reference plane.
-
-### 8.2 Planform
-
-The fretboard outline shall be modeled as a tapered body whose width at the nut and width at the 12th fret are controlled by input parameters.
-
-Because width at the 12th fret is a required input, the system shall derive the taper from this known width rather than treating taper as decorative or approximate.
-
-The project shall define how the board extends beyond the last fret and how total board length is determined. This may be an explicit input or a documented default rule, but it shall not remain implicit.
-
-### 8.3 Playing Surface Radius
-
-The fretboard top surface shall be modeled as a radiused surface suitable for actual manufacturing geometry.
-
-For the initial implementation, a cylindrical radius is acceptable and preferred. A construction based on intersecting a cylinder with the tapered board body is valid and aligns with the intended manufacturing geometry.
-
-The radius must exist as real 3D geometry in the exported model.
-
-### 8.4 Baseline Construction Sequence
-
-The default geometric construction sequence for the initial implementation shall be:
-
-1. Create an oversize rectangular fretboard blank rather than beginning with the final tapered outline.
-2. Form the radiused top surface on that rectangular blank using the fingerboard cylinder or an equivalent cylindrical construction.
-3. Define fret slot cutter geometry on the rectangular radiused body.
-4. Cut the fret slots before trimming the board to its final tapered outline.
-5. Trim the slotted blank to the finished trapezoidal or otherwise final planform.
-
-This sequence is the preferred baseline because it simplifies cylindrical top construction, simplifies curved fret-slot generation, and keeps fret-slot cutting independent of final edge taper.
-
-For the baseline implementation, fret slots shall be treated as full-width cuts in the pre-trim body. The final fretboard outline operation shall clip those slots to the finished fretboard edges.
-
-### 8.5 Fret Locations and Slots
-
-Fret positions shall be computed from the selected scale definition and scale length.
-
-Fret positions shall be represented in a form that can drive actual solid cuts or sketches in the CAD pipeline.
-
-Fret slots shall be cut after the fretboard body and top surface are created.
-
-For the baseline cylindrical fretboard workflow, fret slot cuts should be modeled using swept cutter geometry or an equivalent operation that preserves the fretboard crown through the slot floor.
-
-At minimum, each slot definition shall include:
-
-- slot position
-- slot orientation
-- slot depth
-- slot width or cutter-equivalent width
-
-### 8.6 Inlay Direction
-
-The architecture shall permit future inlay geometry without forcing a redesign of the fretboard pipeline.
-
-A future implementation may support inlays defined either parametrically or by user-supplied SVG artwork. SVG-driven inlays shall be treated as geometry input, validated before CAD operations, and cut or pocketed through the same CAD backend approach used for fret slots.
-
-## 9. Output Requirements
-
-STEP export is the primary required output.
-
-A conforming implementation shall:
-
-- produce a STEP file from the generated fretboard geometry
-- do so through a repeatable scripted process
-- produce output that can be opened in standard CAD software
-- preserve the essential fretboard solid and slot geometry in the exported model
-
-If an external CAD tool is used as an intermediary, the automation path shall remain part of the project, not a manual undocumented side process.
-
-## 10. Implementation Requirements
-
-### 10.1 Acceptable Geometry Paths
-
-The following implementation strategies are acceptable:
-
-- native Python generation using a reliable geometry library that can produce solids and STEP output
-- scripted FreeCAD generation and export
-- scripted Fusion 360 generation and export
-- another scriptable CAD kernel or CAD application with reliable STEP support
-
-The choice of implementation shall be driven by reliability, automation, maintainability, and output correctness rather than by preference for a purely native Python stack.
-
-### 10.2 Architecture
-
-The repository shall be organized so that these concerns are separate:
-
-- preset loading and validation
-- musical and geometric calculations
-- solid-model construction
-- file export
-- user interface concerns
-
-The package layout shall reflect this separation. User interfaces shall call into the package API rather than containing geometry logic directly.
-
-### 10.3 User Interface Direction
-
-A desktop GUI is not required for the core product to succeed.
-
-If a UI is provided during early development, Streamlit is the preferred default because it is fast to iterate on while geometry and export behavior are still changing. A future alternative UI is acceptable if it better supports CAD-preview and file-upload workflows.
-
-### 10.4 Graphical Workflow Requirements
-
-If a graphical UI is provided, the basic user workflow shall be:
-
-1. The user selects a preset from a dropdown list.
-2. The system loads that preset into editable parameter fields.
-3. The user optionally modifies any parameter values.
-4. The user may optionally provide a new preset name and save the modified values as a user preset.
-5. The user clicks a `Generate` action to create the output.
-
-Generated output shall be written to the active work folder unless the implementation later introduces an explicit output-path control.
-
-The UI shall make it clear whether the current parameter set is a built-in preset, a modified unsaved preset, or a saved user preset.
-
-If the UI exposes a units selector, changing that selector shall convert the displayed numeric values rather than merely changing the label.
-
-### 10.5 Command-Line Workflow Requirements
-
-The project shall provide a CLI workflow that covers the same basic behavior as the graphical workflow.
-
-At minimum, the CLI shall support:
-
-- listing available presets
-- selecting a preset by stable id or display name
-- overriding any supported parameter through flags or an equivalent structured input mechanism
-- selecting the units used to interpret dimensional override values
-- saving the resolved parameter set as a new user preset
-- generating output without requiring a graphical interface
-
-The CLI shall treat preset selection as the starting point for parameter resolution, then apply any user-supplied overrides, then perform generation.
-
-The CLI shall support a save-as operation for user presets. This may be implemented through an explicit `save-preset` style command or through generation flags that name and persist a new preset before or during output generation.
-
-Unless an explicit output path is provided, generated files from the CLI shall be written to the current working directory.
-
-## 11. Validation Requirements
-
-The project shall support verification of the generated model against source parameters.
-
-At minimum, the implementation shall permit validation of:
-
-- overall scale length behavior
-- fret positions
-- nut width
-- 12th-fret width
-- top radius
-- presence and placement of fret slots
-- successful STEP export
-- correct conversion between internal millimeters and display units
-- correct clipping of pre-trim fret slots by the final fretboard outline
-
-Validation may be performed through unit tests, geometric assertions, exported measurements, or CAD-side inspection tooling. The exact mechanism may vary, but the project shall not rely solely on visual confidence.
-
-## 12. Immediate Project Direction
-
-The next design and implementation decisions shall be made in this order:
-
-1. Define the minimal authoritative fretboard parameter set required to build a real solid.
-2. Choose the CAD generation path most likely to deliver reliable scripted STEP export.
-3. Build a geometry pipeline that creates the rectangular blank and cylindrical top surface.
-4. Add curved fret slot cutting on the pre-trim body.
-5. Trim the slotted blank to the final fretboard outline.
-6. Add inlay pocketing only after the core fretboard body and slot workflow is stable.
-7. Export STEP and verify the result in an external CAD viewer.
-
-Any existing code that does not materially support this sequence may be replaced.
+This document defines the currently supported, testable requirements for the project. Every requirement in this document is intended to be verifiable by automated tests.
+
+## Product Requirements
+
+- `FR-001` The system shall generate a fretboard solid and export it to a STEP file through a scripted process.
+- `FR-002` The system shall write a sidecar JSON manifest next to each generated STEP file. The manifest shall include the resolved spec name, display units, internal units, and slot count.
+- `FR-003` All in-memory geometric values shall use millimeters regardless of the preset display units.
+- `FR-004` The minimum geometric inputs shall be validated: `scale_length`, `num_frets`, `num_strings`, `fingerboard_width_at_nut`, `fingerboard_width_at_12th_fret`, and `fingerboard_radius` must all be valid for generation.
+- `FR-005` The authoritative built-in preset store shall be JSON with a top-level `version` field, a top-level `presets` list, and per-preset `id`, `name`, `units`, `geometry`, and `metadata` fields.
+- `FR-006` Presets shall be selectable by either stable `id` or display `name`.
+- `FR-007` Loading a preset for editing shall preload all current geometry fields, display units, and metadata into editable fields.
+- `FR-008` Changing display units shall convert the displayed length fields while preserving the same modeled geometry.
+- `FR-009` CLI dimensional overrides shall be interpreted in the units selected for that invocation. If override units are omitted, the preset's preferred display units shall be used.
+- `FR-010` User presets shall be stored in a separate JSON file, shall preserve the selected display units when serialized, and shall appear in the same preset listing flow as built-in presets.
+- `FR-011` Work-folder resolution shall prefer an explicit `--work-folder` path, then `FRETBOARD_WORK_FOLDER`, then the current working directory.
+- `FR-012` The fretboard taper shall be derived from the nut width and the 12th-fret width, and the width at half scale length shall equal the specified 12th-fret width.
+- `FR-013` The default board-length rule shall extend the board beyond the last fret by the configured CAD default end extension.
+- `FR-014` Slot definitions shall include slot position, slot orientation, slot depth, and slot width for every fret.
+- `FR-015` The CLI shall support listing presets, saving a user preset, and generating output without requiring the graphical UI.
+- `FR-016` If the Streamlit UI is provided, it shall separate preset selection and preset status from editable input controls using distinct visual sections.
+- `FR-017` The UI shall group editable inputs into at least two sections: core geometry inputs and secondary metadata inputs.
+- `FR-018` The core geometry section shall expose the minimum design-driving inputs without requiring the user to scan through metadata fields first.
+- `FR-019` The UI shall present preset source and resolved work-folder information in a section that is visually separate from the editable form fields.
+- `FR-020` The primary generation action in the UI shall remain visually associated with the core geometry inputs rather than being placed after all secondary metadata fields.
+- `FR-021` If the UI exposes a units selector, changing that selector shall convert displayed numeric length fields rather than only changing labels.
+- `FR-022` Selecting a preset in the UI shall preload all editable fields into the appropriate sections of the form.
+- `FR-023` The UI shall allow the user to save the current parameter set as a user preset without mixing that action into the primary geometry-editing section.
+- `FR-024` Musical scale utilities shall support equal-temperament scales and alternate explicit scale definitions for fret-position calculations.
+- `FR-025` The application shall provide a centralized logging configuration that supports the standard Python `DEBUG`, `INFO`, `WARNING`, and `ERROR` levels through configuration inputs.
+
+## Advisory Notes
+
+These statements guide design decisions but are not treated as requirements for test coverage:
+
+- Geometry and export correctness take priority over UI polish.
+- Presets are convenience inputs rather than the architectural center of the system.
+- Future inlay support remains a valid extension point, but it is not part of the current required scope.
+- Manual CAD inspection is still useful for qualitative review, but it does not replace automated verification.

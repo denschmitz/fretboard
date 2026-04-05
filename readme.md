@@ -6,6 +6,23 @@ The current project generates a real STEP model, writes output artifacts to a wo
 
 ![Example Gibson Les Paul fretboard render](docs/images/gibson_les_paul_v1.png)
 
+## Quick Start
+
+Create a local virtual environment, then install the project into that environment in editable mode.
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .[ui,dev]
+```
+
+Or use the helper script, which assumes `.venv` already exists and installs the default `ui` and `dev` extras:
+
+```powershell
+.\scripts\setup_env.ps1
+```
+
+That setup makes the package importable from the repo checkout, keeps the environment isolated, and avoids relying on `PYTHONPATH`.
+
 ## Current Capabilities
 
 - Versioned JSON presets with built-in and user-defined entries
@@ -19,12 +36,12 @@ The current project generates a real STEP model, writes output artifacts to a wo
 ## Project Structure
 
 ```text
-docs/       Design and architecture documents
+docs/       Design and architecture documents and tracked images for the README
 presets/    Built-in and user preset data
 references/ Historical reference assets
 src/        Application package
 tests/      Behavioral and backend tests
-scripts/    Small helper scripts
+scripts/    Helper scripts for setup, launch, and inspection
 artifacts/  Generated output when using the default local launch setup
 ```
 
@@ -59,33 +76,53 @@ The work folder can be controlled by:
 
 ## CLI Usage
 
+After editable install, you can use either the module form or the packaged console command.
+
 List presets:
 
 ```powershell
-python -m fretboard.cli list-presets
+fretboard list-presets
+```
+
+Or through the helper wrapper:
+
+```powershell
+.\scripts\run_cli.ps1 list-presets
 ```
 
 Save a modified preset as a user preset:
 
 ```powershell
-python -m fretboard.cli save-preset --preset gibson_les_paul --units mm --scale-length 635 --save-preset-name "Workshop LP"
+fretboard save-preset --preset gibson_les_paul --units mm --scale-length 635 --save-preset-name "Workshop LP"
 ```
 
 Generate a STEP file into a work folder:
 
 ```powershell
-python -m fretboard.cli generate --preset gibson_les_paul --work-folder artifacts
+fretboard generate --preset gibson_les_paul --work-folder artifacts
 ```
 
 Generate with overrides:
 
 ```powershell
-python -m fretboard.cli generate --preset gibson_les_paul --units mm --num-frets 24 --scale-length 635 --work-folder artifacts
+fretboard generate --preset gibson_les_paul --units mm --num-frets 24 --scale-length 635 --work-folder artifacts
 ```
 
 ## Streamlit UI
 
 The current UI is implemented in [streamlit_app.py](C:/Data/dev/fretboard/src/fretboard/ui/streamlit_app.py).
+
+Launch it with:
+
+```powershell
+.\scripts\run_ui.ps1
+```
+
+Or directly:
+
+```powershell
+.\.venv\Scripts\streamlit.exe run .\src\fretboard\ui\streamlit_app.py
+```
 
 The UI supports:
 
@@ -118,13 +155,13 @@ The historical reference file is kept at [fretfind.js](C:/Data/dev/fretboard/ref
 
 ## Development
 
-Install dependencies:
+Run tests with the helper script:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\scripts\run_tests.ps1
 ```
 
-Run tests:
+Or directly through the repo-local Python:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests -p no:cacheprovider
@@ -135,3 +172,5 @@ VS Code launch configurations are provided for:
 - CLI generation
 - Streamlit UI
 - test execution
+
+

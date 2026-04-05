@@ -10,7 +10,10 @@ from fretboard.app import (
     resolved_work_folder,
     save_named_user_preset,
 )
+from fretboard.logging_utils import configure_logging, get_logger
 
+
+logger = get_logger(__name__)
 
 
 def add_override_arguments(parser: argparse.ArgumentParser) -> None:
@@ -45,6 +48,7 @@ def extract_overrides(args: argparse.Namespace) -> dict:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Parametric fretboard generator")
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Logging level")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     list_parser = subparsers.add_parser("list-presets", help="List available presets")
@@ -80,6 +84,8 @@ def _print_preset_list(user_path: Path | None) -> None:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+    configure_logging(args.log_level)
+    logger.debug("CLI command: %s", args.command)
 
     if args.command == "list-presets":
         _print_preset_list(args.user_presets)

@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 from fretboard.errors import PresetError
+from fretboard.logging_utils import get_logger
 from fretboard.units import DIMENSION_FIELDS, from_internal_length, round_display, to_internal_length
 
 from .models import FretboardGeometry, FretboardMetadata, FretboardSpec, Preset
@@ -11,6 +12,7 @@ from .validation import validate_spec
 
 PRESET_FILE_VERSION = 1
 
+logger = get_logger(__name__)
 
 
 def default_presets_path() -> Path:
@@ -67,6 +69,7 @@ def _read_payload(path: Path, *, create_if_missing: bool = False) -> dict:
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"version": PRESET_FILE_VERSION, "presets": []}
         path.write_text(json.dumps(payload, indent=2) + "\n")
+        logger.info("Created preset store at %s", path)
         return payload
 
     try:
@@ -130,15 +133,19 @@ def load_presets(
     include_user: bool = True,
     user_path: Path | None = None,
 ) -> list[Preset]:
-    built_in = _load_presets_from_path(path or default_presets_path(), source="built_in")
+    built_in_path = path or default_presets_path()
+    built_in = _load_presets_from_path(built_in_path, source="built_in")
     if not include_user:
+        logger.debug("Loaded %s built-in presets", len(built_in))
         return built_in
 
+    user_store = user_path or default_user_presets_path()
     user_presets = _load_presets_from_path(
-        user_path or default_user_presets_path(),
+        user_store,
         source="user",
         create_if_missing=True,
     )
+    logger.debug("Loaded %s built-in presets and %s user presets", len(built_in), len(user_presets))
     return [*built_in, *user_presets]
 
 
@@ -185,6 +192,8 @@ def build_spec_from_preset(
     incoming = (overrides or {}).copy()
     if incoming.get("units") is not None:
         units = incoming["units"]
+
+    logger.debug("Applying overrides for preset %s: %s", identifier, sorted(key for key, value in incoming.items() if value is not None))
 
     for key, value in incoming.items():
         if value is None:
@@ -242,4 +251,5 @@ def save_user_preset(
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(json.dumps(payload, indent=2) + "\n")
+    logger.info("Saved user preset %s to %s", preset_name, target_path)
     return _preset_from_dict(record, source="user")

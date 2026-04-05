@@ -4,10 +4,12 @@ import re
 from pathlib import Path
 
 from fretboard.domain.models import FretboardSpec
+from fretboard.logging_utils import get_logger
 
 
 WORK_FOLDER_ENV = "FRETBOARD_WORK_FOLDER"
 
+logger = get_logger(__name__)
 
 
 def _slugify_filename(value: str) -> str:
@@ -23,6 +25,7 @@ def resolve_work_folder(work_folder: Path | None = None) -> Path:
         env_value = os.environ.get(WORK_FOLDER_ENV)
         resolved = Path(env_value) if env_value else Path.cwd()
     resolved.mkdir(parents=True, exist_ok=True)
+    logger.debug("Resolved work folder %s", resolved)
     return resolved
 
 
@@ -48,4 +51,5 @@ def write_design_output(summary: dict, step_path: Path) -> Path:
         "spec": summary,
     }
     target_path.write_text(json.dumps(payload, indent=2) + "\n")
+    logger.info("Wrote manifest to %s", target_path)
     return target_path
