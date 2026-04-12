@@ -1,24 +1,63 @@
 {
   "output_type": "fretboard_design_manifest",
+  "step_file": "gibson_les_paul.step",
   "spec": {
     "id": "gibson_les_paul",
-    "name": "Gibson Les Paul",
+    "name": "Gibson Les Paul Standard '60s",
     "units": "in",
+    "internal_units": "mm",
     "geometry": {
       "scale_length": 24.75,
       "num_frets": 22,
       "num_strings": 6,
-      "fingerboard_width_at_nut": 1.695,
-      "fingerboard_width_at_12th_fret": 2.26,
-      "fingerboard_width_at_scale": 2.8249999999999993,
+      "fingerboard_width_at_nut": 1.69,
+      "fingerboard_width_at_12th_fret": 2.075932,
+      "fingerboard_width_at_end": 2.26,
+      "fingerboard_width_at_scale": 2.461863,
       "fingerboard_radius": 12.0
+    },
+    "construction": {
+      "fingerboard_thickness": 0.25,
+      "board_end_extension": 0.472441,
+      "edge_fillet": 0.0
+    },
+    "construction_mm": {
+      "fingerboard_thickness": 6.35,
+      "board_end_extension": 12.000001,
+      "edge_fillet": 0.0
+    },
+    "slotting": {
+      "wire_profile_id": "legacy_medium",
+      "fit_profile_id": "legacy_default",
+      "slot_width_source": "profile",
+      "slot_depth_source": "profile",
+      "tang_offset_source": "default",
+      "resolved_slot_width": 0.022835,
+      "resolved_slot_depth": 0.070866,
+      "resolved_tang_offset": 0.0
+    },
+    "slotting_mm": {
+      "resolved_slot_width": 0.58,
+      "resolved_slot_depth": 1.8,
+      "resolved_tang_offset": 0.0
+    },
+    "geometry_mm": {
+      "scale_length": 628.65,
+      "fingerboard_width_at_nut": 42.926,
+      "fingerboard_width_at_12th_fret": 52.72866,
+      "fingerboard_width_at_end": 57.404,
+      "fingerboard_width_at_scale": 62.53132,
+      "fingerboard_radius": 304.8
     },
     "metadata": {
       "fingerboard_material": "Rosewood",
       "fret_material": "Nickel Silver",
       "nut_material": "Graph Tech",
       "inlay_material": "Acrylic",
-      "inlay_style": "Trapezoid"
+      "inlay_style": "Trapezoid",
+      "display_notes": null,
+      "era": null,
+      "label": null
     },
     "slot_count": 22
   }

@@ -25,12 +25,21 @@ def add_override_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--num-frets", type=int, help="Override fret count")
     parser.add_argument("--num-strings", type=int, help="Override string count")
     parser.add_argument("--width-at-nut", type=float, help="Override fingerboard width at nut")
+    parser.add_argument("--width-at-end", type=float, help="Override fingerboard width at end")
     parser.add_argument(
         "--width-at-12th-fret",
         type=float,
         help="Override fingerboard width at 12th fret",
     )
     parser.add_argument("--radius", type=float, help="Override fingerboard radius")
+    parser.add_argument("--fingerboard-thickness", type=float, help="Override fingerboard thickness")
+    parser.add_argument("--board-end-extension", type=float, help="Override board end extension")
+    parser.add_argument("--edge-fillet", type=float, help="Override edge fillet")
+    parser.add_argument("--wire-profile-id", help="Select fretwire profile id")
+    parser.add_argument("--fit-profile-id", help="Select fit/process profile id")
+    parser.add_argument("--slot-width", type=float, help="Override resolved slot width")
+    parser.add_argument("--slot-depth", type=float, help="Override resolved slot depth")
+    parser.add_argument("--tang-offset", type=float, help="Override tang offset")
 
 
 
@@ -41,8 +50,17 @@ def extract_overrides(args: argparse.Namespace) -> dict:
         "num_frets": args.num_frets,
         "num_strings": args.num_strings,
         "fingerboard_width_at_nut": args.width_at_nut,
+        "fingerboard_width_at_end": args.width_at_end,
         "fingerboard_width_at_12th_fret": args.width_at_12th_fret,
         "fingerboard_radius": args.radius,
+        "fingerboard_thickness": args.fingerboard_thickness,
+        "board_end_extension": args.board_end_extension,
+        "edge_fillet": args.edge_fillet,
+        "wire_profile_id": args.wire_profile_id,
+        "fit_profile_id": args.fit_profile_id,
+        "slot_width": args.slot_width,
+        "slot_depth": args.slot_depth,
+        "tang_offset": args.tang_offset,
     }
 
 

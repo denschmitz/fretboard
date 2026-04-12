@@ -1,0 +1,28 @@
+{
+  "id": "gibson_les_paul",
+  "name": "Gibson Les Paul Standard '60s",
+  "units": "in",
+  "geometry": {
+    "scale_length": 24.75,
+    "num_frets": 22,
+    "num_strings": 6,
+    "fingerboard_width_at_nut": 1.69,
+    "fingerboard_width_at_12th_fret": 2.075932,
+    "fingerboard_radius": 12.0
+  },
+  "construction": {
+    "fingerboard_thickness": 0.25,
+    "board_end_extension": 0.472441
+  },
+  "slotting": {
+    "wire_profile_id": "legacy_medium",
+    "fit_profile_id": "legacy_default"
+  },
+  "metadata": {
+    "fingerboard_material": "Rosewood",
+    "fret_material": "Nickel Silver",
+    "nut_material": "Graph Tech",
+    "inlay_material": "Acrylic",
+    "inlay_style": "Trapezoid"
+  }
+}

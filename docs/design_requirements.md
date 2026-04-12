@@ -5,37 +5,37 @@ This document defines the currently supported, testable requirements for the pro
 ## Product Requirements
 
 - `FR-001` The system shall generate a fretboard solid and export it to a STEP file through a scripted process.
-- `FR-002` The system shall write a sidecar JSON manifest next to each generated STEP file. The manifest shall include the resolved spec name, display units, internal units, and slot count.
+- `FR-002` The system shall write a sidecar JSON manifest next to each generated STEP file. The manifest shall include the resolved spec name, display units, internal units, slot count, and resolved slotting summary.
 - `FR-003` All in-memory geometric values shall use millimeters regardless of the preset display units.
-- `FR-004` The minimum geometric inputs shall be validated: `scale_length`, `num_frets`, `num_strings`, `fingerboard_width_at_nut`, `fingerboard_width_at_12th_fret`, and `fingerboard_radius` must all be valid for generation.
-- `FR-005` The authoritative built-in preset store shall be JSON with a top-level `version` field, a top-level `presets` list, and per-preset `id`, `name`, `units`, `geometry`, and `metadata` fields.
+- `FR-004` The minimum geometric inputs shall be validated: `scale_length`, `num_frets`, `num_strings`, `fingerboard_width_at_nut`, at least one of `fingerboard_width_at_12th_fret` or `fingerboard_width_at_end`, and `fingerboard_radius` must all be valid for generation.
+- `FR-005` The authoritative built-in preset store shall be JSON with top-level `version`, `presets`, `wire_profiles`, and `fit_profiles` fields.
 - `FR-006` Presets shall be selectable by either stable `id` or display `name`.
-- `FR-007` Loading a preset for editing shall preload all current geometry fields, display units, and metadata into editable fields.
+- `FR-007` Loading a preset for editing shall preload all editable geometry, construction, slotting, display-units, and metadata fields into editable fields.
 - `FR-008` Changing display units shall convert the displayed length fields while preserving the same modeled geometry.
 - `FR-009` CLI dimensional overrides shall be interpreted in the units selected for that invocation. If override units are omitted, the preset's preferred display units shall be used.
-- `FR-010` User presets shall be stored in a separate JSON file, shall preserve the selected display units when serialized, and shall appear in the same preset listing flow as built-in presets.
+- `FR-010` User presets shall be stored in a separate JSON file, shall preserve the selected display units when serialized, shall preserve `geometry`, `construction`, `slotting`, and `metadata` when serialized, and shall appear in the same preset listing flow as built-in presets.
 - `FR-011` Output location resolution shall prefer an explicit `--output` file path, then an explicit `--work-folder` path, then `FRETBOARD_WORK_FOLDER`, then the current working directory.
-- `FR-012` The fretboard taper shall be derived from the nut width and the 12th-fret width, and the width at half scale length shall equal the specified 12th-fret width.
+- `FR-012` The fretboard taper shall be derivable from the nut width together with either the 12th-fret width or the physical board-end width, and the width at half scale length shall equal the specified or resolved 12th-fret width.
 - `FR-013` The default board-length rule shall extend the board beyond the last fret by the configured CAD default end extension.
-- `FR-014` Slot definitions shall include slot position, slot orientation, slot depth, and slot width for every fret.
+- `FR-014` Slot definitions shall include slot position, slot orientation, slot depth, and slot width for every fret, using resolved slotting inputs rather than ad hoc hard-coded values.
 - `FR-015` The CLI shall support listing presets, exporting a preset, importing a preset, saving a user preset, and generating output without requiring the graphical UI.
 - `FR-016` If the Streamlit UI is provided, it shall separate preset selection and preset status from editable input controls using distinct visual sections.
-- `FR-017` The UI shall group editable inputs into at least two sections: core geometry inputs and secondary metadata inputs.
-- `FR-018` The core geometry section shall expose the minimum design-driving inputs without requiring the user to scan through metadata fields first.
+- `FR-017` The UI shall group editable inputs into at least four sections: core geometry inputs, construction inputs, slotting inputs, and metadata inputs.
+- `FR-018` The core geometry section shall expose the minimum design-driving inputs without requiring the user to scan through construction, slotting, or metadata fields first.
 - `FR-019` The UI shall present preset source and resolved work-folder information in a section that is visually separate from the editable form fields.
 - `FR-020` The primary generation action in the UI shall remain visually associated with the core geometry inputs rather than being placed after all secondary metadata fields.
 - `FR-021` If the UI exposes a units selector, changing that selector shall convert displayed numeric length fields rather than only changing labels.
-- `FR-022` Selecting a preset in the UI shall preload all editable fields into the appropriate sections of the form.
-- `FR-023` The UI shall allow the user to save the current parameter set as a user preset without mixing that action into the primary geometry-editing section.
+- `FR-022` Selecting a preset in the UI shall preload all editable geometry, construction, slotting, and metadata fields into the appropriate sections of the form.
+- `FR-023` The UI shall allow the user to save the current parameter set as a user preset without mixing that action into the primary geometry-editing section, and the save flow shall preserve construction and slotting values.
 - `FR-024` Musical scale utilities shall support equal-temperament scales and alternate explicit scale definitions for fret-position calculations.
 - `FR-025` The application shall provide a centralized logging configuration that supports the standard Python `DEBUG`, `INFO`, `WARNING`, and `ERROR` levels through configuration inputs.
-- `FR-026` The CLI shall export any built-in or user preset to a standalone JSON file representing a single guitar preset that can be edited outside the application.
-- `FR-027` The CLI shall import a standalone preset JSON file into the user preset store, preserving its display units and making it available in subsequent preset listings and generation flows.
+- `FR-026` The CLI shall export any built-in or user preset to a standalone JSON file representing a single fretboard preset with `id`, `name`, `units`, `geometry`, `construction`, `slotting`, and `metadata` fields.
+- `FR-027` The CLI shall import a standalone preset JSON file into the user preset store, preserving its display units and all supported preset sections and making it available in subsequent preset listings and generation flows.
 - `FR-028` Presets imported into the user preset store shall be selectable by name in subsequent CLI runs using the same lookup flow as built-in presets.
 - `FR-029` The CLI preset listing command shall print all available preset names to the console, including both built-in and user presets.
 - `FR-030` The CLI generate command shall accept an explicit output file path and filename for the generated STEP file. When provided, that path shall take precedence over work-folder-based output location.
-- `FR-031` The system shall define a standalone JSON format for an individual preset export/import file, including the fields required to recreate a preset in the user preset store.
-- `FR-032` Imported preset JSON files shall be validated for required preset fields and rejected with a clear error if invalid.
+- `FR-031` The system shall define a standalone JSON format for an individual preset export/import file, including the fields required to recreate a preset in the user preset store and preserve slotting selections and overrides.
+- `FR-032` Imported preset JSON files shall be validated for required preset fields, construction fields, and slotting fields and rejected with a clear error if invalid.
 - `FR-033` The system shall generate inlay recess geometry at the standard fretboard marker positions for presets whose metadata includes any inlay style value.
 - `FR-034` The alpha inlay implementation shall resolve every supported or unsupported preset inlay style value to the dot inlay geometry path for CAD generation.
 - `FR-035` Dot inlays shall use a single shared diameter for all non-octave markers within a generated fretboard.
@@ -43,7 +43,6 @@ This document defines the currently supported, testable requirements for the pro
 - `FR-037` The CAD backend shall create dot inlay recesses by generating a 2D circle profile and applying a subtractive extrusion into the fretboard top face.
 - `FR-038` The inlay cutting depth target shall be 5.0 millimeters measured at the apex of the curved fretboard top surface; deeper material removal away from the apex due to surface curvature is acceptable.
 - `FR-039` The CAD implementation shall separate inlay profile creation from the subtractive extrusion operation so alternate inlay shapes can be introduced without replacing the extrusion workflow.
-
 - `FR-040` The system shall support custom inlay profiles sourced from SVG geometry files.
 - `FR-041` A custom inlay SVG shall be interpreted as 2D profile geometry only; fill color, stroke color, stroke width, text, filters, masks, clipping paths, gradients, and raster images shall not affect CAD generation.
 - `FR-042` A custom inlay SVG shall use millimeters as its authored geometric units.
@@ -67,6 +66,40 @@ This document defines the currently supported, testable requirements for the pro
 - `FR-060` If a custom inlay SVG asset fails validation during load, the system shall substitute the corresponding marker with the fallback dot inlay geometry so generation can continue.
 - `FR-061` When a custom inlay SVG asset fails validation and a fallback dot inlay is substituted, the system shall emit a warning-level log message identifying the affected asset and marker location.
 - `FR-062` If SVG validation failures result in a generated artifact that does not match the requested custom inlay geometry, the system shall emit an error-level log message indicating that the output artifact is degraded and requires review.
+- `FR-063` If both `fingerboard_width_at_12th_fret` and `fingerboard_width_at_end` are provided, they shall define the same linear taper geometry; otherwise the system shall reject the preset with a clear validation error.
+- `FR-064` Each preset object in the built-in preset store, standalone preset format, and user preset store shall contain `id`, `name`, `units`, `geometry`, `construction`, `slotting`, and `metadata` sections.
+- `FR-065` The `geometry` section shall contain the design-driving fretboard layout inputs and shall exclude derived layout values such as first-fret position, per-fret positions, and fret multiplier constants.
+- `FR-066` The minimum generation inputs shall remain geometry-driven: `scale_length`, `num_frets`, `num_strings`, `fingerboard_width_at_nut`, at least one of `fingerboard_width_at_12th_fret` or `fingerboard_width_at_end`, and `fingerboard_radius` shall be required for generation.
+- `FR-067` Construction fields shall be validated separately from geometry fields.
+- `FR-068` The `construction` section shall contain board-shaping values that affect the physical board solid but are not musical layout inputs, including the board end extension and any modeled fingerboard thickness value.
+- `FR-068A` The system shall define `construction.fingerboard_thickness` as the finished fretboard thickness measured from the bottom face to the apex of the radiused top surface at the longitudinal centerline.
+- `FR-068B` The CAD generation process shall produce geometry such that the distance from the bottom face to the radiused top apex equals the resolved `fingerboard_thickness`.
+- `FR-068C` The `construction.fingerboard_thickness` definition shall remain valid regardless of fingerboard radius.
+- `FR-069` The `slotting` section shall support `wire_profile_id`, `fit_profile_id`, optional explicit `slot_width`, optional explicit `slot_depth`, and optional explicit `tang_offset`.
+- `FR-070` The system shall provide a built-in `wire_profiles` store in the authoritative preset JSON payload.
+- `FR-071` The system shall provide a built-in `fit_profiles` store in the authoritative preset JSON payload.
+- `FR-072` Each wire profile shall support `id`, `name`, `tang_width`, and `tang_depth`.
+- `FR-073` Each fit profile shall support `id`, `name`, `slot_width_delta_from_tang`, and `slot_depth_delta_from_tang`.
+- `FR-074` Slotting selections and slotting overrides shall be validated separately from geometry fields.
+- `FR-075` The system shall resolve slotting values with this precedence order: explicit slotting overrides on the current preset or working form, then values resolved from `wire_profile_id` plus `fit_profile_id`, then deterministic compatibility defaults only where required for backward compatibility.
+- `FR-076` If slotting inputs are under-specified and cannot be resolved deterministically, the system shall reject generation with a clear validation error.
+- `FR-077` When `wire_profile_id` and `fit_profile_id` are valid and no explicit slot width or slot depth overrides are present, the resolved slot width and resolved slot depth shall be derived from the selected profiles.
+- `FR-078` Advanced users shall be able to override resolved slot width, slot depth, and tang offset without replacing the selected profile identifiers.
+- `FR-079` The UI slotting section shall allow selecting a wire profile, selecting a fit profile, viewing resolved slot width and resolved slot depth, and enabling manual override of slot width, slot depth, and tang offset.
+- `FR-080` The UI shall provide validation feedback when the selected slotting combination is invalid or incomplete.
+- `FR-081` The primary generation action in the UI shall remain visually associated with the core geometry section rather than being placed after construction, slotting, and metadata controls.
+- `FR-082` Changing presets in the UI shall update all editable sections, including slotting selections and overrides.
+- `FR-083` The CLI shall support specifying `wire_profile_id`, `fit_profile_id`, explicit slot width, explicit slot depth, and explicit tang offset overrides.
+- `FR-084` CLI dimensional overrides for construction and slotting fields shall be interpreted in the units selected for that invocation. If override units are omitted, the preset's preferred display units shall be used.
+- `FR-085` The sidecar JSON manifest shall include the selected `wire_profile_id`, selected `fit_profile_id`, resolved slot width, resolved slot depth, resolved tang offset when applicable, and the source used to determine slot width and slot depth.
+- `FR-086` Built-in and user preset listing flows shall continue to work when preset records include the new `construction` and `slotting` sections.
+- `FR-087` Imported legacy preset JSON files that contain only geometry and metadata shall be migrated when the missing sections can be filled deterministically.
+- `FR-088` Legacy preset migration shall map legacy slot-like fields into the new model when deterministic mapping rules exist.
+- `FR-089` Legacy preset migration shall emit a clear warning when source fields are deprecated, partially mapped, or ignored.
+- `FR-090` Legacy preset migration shall reject ambiguous preset data with a clear validation or migration error instead of silently reinterpreting it.
+- `FR-091` Derived slotting values and derived fret layout math shall be computed internally and shall not be serialized as user-editable preset inputs unless a separate requirement explicitly authorizes that serialization.
+- `FR-092` Requirement traceability artifacts in the `docs` folder shall be updated when requirements or requirement IDs change so they reflect the current implementation and automated coverage status.
+
 ## Advisory Notes
 
 These statements guide design decisions but are not treated as requirements for test coverage:
@@ -74,6 +107,6 @@ These statements guide design decisions but are not treated as requirements for 
 - Geometry and export correctness take priority over UI polish.
 - Presets are convenience inputs rather than the architectural center of the system.
 - Future custom inlay shape support, such as SVG-driven profiles, remains a valid extension point beyond the alpha dot implementation.
+- Future bottom-face taper or thickness-at-both-ends support remains a valid extension point, but it is not part of the current requirement set until explicit construction fields and validation rules are defined.
 - For `1.0 alpha`, exported STEP geometry still requires human-in-the-loop validation because an automated STEP-geometry verification method has not yet been defined.
 - Manual CAD inspection is still useful for qualitative review, but it does not replace automated verification.
-

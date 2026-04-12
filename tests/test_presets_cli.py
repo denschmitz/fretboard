@@ -32,7 +32,7 @@ def test_cli_lists_preset_names(capsys, monkeypatch) -> None:
     monkeypatch.setattr("sys.argv", ["fretboard", "list-presets"])
     cli.main()
     out_lines = [line.strip() for line in capsys.readouterr().out.splitlines() if line.strip()]
-    assert "Gibson Les Paul" in out_lines
+    assert "Gibson Les Paul Standard '60s" in out_lines
     assert all("	" not in line for line in out_lines)
 
 
@@ -67,6 +67,7 @@ def test_cli_save_preset_command(capsys, monkeypatch) -> None:
         payload = json.loads(user_path.read_text())
         assert payload["presets"][0]["name"] == "Workshop LP"
         assert payload["presets"][0]["geometry"]["scale_length"] == 635.0
+        assert payload["presets"][0]["slotting"]["wire_profile_id"] == "legacy_medium"
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -95,6 +96,8 @@ def test_cli_exports_imports_and_lists_user_presets(capsys, monkeypatch) -> None
         exported["name"] = "Workshop LP Imported"
         exported["id"] = "workshop_lp_imported"
         exported["geometry"]["scale_length"] = 25.0
+        exported["slotting"]["wire_profile_id"] = "medium_jumbo_nickel"
+        exported["slotting"]["fit_profile_id"] = "press_fit_standard"
         export_path.write_text(json.dumps(exported, indent=2) + "\n")
 
         monkeypatch.setattr(
@@ -175,7 +178,7 @@ def test_cli_generate_writes_step_to_explicit_output_path(capsys, monkeypatch) -
         assert Path(out["output"]) == output_path
         assert output_path.exists()
         assert out["work_folder"] == str(temp_dir)
-        assert out["summary"]["name"] == "Gibson Les Paul"
+        assert out["summary"]["name"] == "Gibson Les Paul Standard '60s"
         assert out["summary"]["units"] == "mm"
         assert out["summary"]["geometry"]["num_frets"] == 24
         assert out["summary"]["geometry"]["scale_length"] == 635.0
@@ -224,8 +227,17 @@ def test_streamlit_module_executes_main(monkeypatch) -> None:
         def button(self, label):
             return False
 
+        def checkbox(self, label, key=None):
+            if key is not None:
+                self.session_state.setdefault(key, False)
+                return self.session_state[key]
+            return False
+
         def success(self, value):
             calls.append(("success", value))
+
+        def error(self, value):
+            calls.append(("error", value))
 
     fake_streamlit = FakeStreamlit()
 
@@ -233,31 +245,67 @@ def test_streamlit_module_executes_main(monkeypatch) -> None:
     import importlib
 
     monkeypatch.setitem(sys.modules, "streamlit", fake_streamlit)
-    monkeypatch.setattr("fretboard.app.available_presets", lambda user_path=None: [types.SimpleNamespace(name="Gibson Les Paul")])
+    monkeypatch.setattr("fretboard.app.available_presets", lambda user_path=None: [types.SimpleNamespace(name="Gibson Les Paul Standard '60s")])
+    monkeypatch.setattr(
+        "fretboard.app.available_slotting_profiles",
+        lambda user_path=None: {
+            "wire_profiles": [
+                types.SimpleNamespace(id="legacy_medium", tang_width=0.58, tang_depth=1.8),
+                types.SimpleNamespace(id="medium_jumbo_nickel", tang_width=0.6, tang_depth=1.7),
+            ],
+            "fit_profiles": [
+                types.SimpleNamespace(id="legacy_default", slot_width_delta_from_tang=0.0, slot_depth_delta_from_tang=0.0),
+                types.SimpleNamespace(id="press_fit_standard", slot_width_delta_from_tang=0.02, slot_depth_delta_from_tang=0.15),
+            ],
+        },
+    )
     monkeypatch.setattr(
         "fretboard.app.editable_fields_from_preset",
         lambda preset, user_path=None: {
             "source": "built_in",
-            "name": "Gibson Les Paul",
+            "name": "Gibson Les Paul Standard '60s",
             "units": "in",
             "scale_length": 24.75,
             "num_frets": 22,
             "num_strings": 6,
-            "fingerboard_width_at_nut": 1.695,
-            "fingerboard_width_at_12th_fret": 2.26,
+            "fingerboard_width_at_nut": 1.69,
+            "fingerboard_width_at_12th_fret": 2.075931504,
+            "fingerboard_width_at_end": 2.26,
             "fingerboard_radius": 12.0,
+            "fingerboard_thickness": 0.25,
+            "board_end_extension": 0.472441,
+            "edge_fillet": 0.0,
+            "wire_profile_id": "legacy_medium",
+            "fit_profile_id": "legacy_default",
+            "slot_width": None,
+            "slot_depth": None,
+            "tang_offset": None,
             "fingerboard_material": "Rosewood",
             "fret_material": "Nickel Silver",
             "nut_material": "Graph Tech",
             "inlay_material": "Acrylic",
             "inlay_style": "Trapezoid",
+            "display_notes": None,
+            "era": None,
+            "label": None,
             "id": "gibson_les_paul",
         },
     )
     monkeypatch.setattr("fretboard.app.convert_display_fields", lambda fields, new_units: {**fields, "units": new_units})
+    monkeypatch.setattr(
+        "fretboard.app.resolve_spec",
+        lambda preset, overrides=None, user_path=None: types.SimpleNamespace(
+            name="Gibson Les Paul Standard '60s",
+            units="in",
+            slotting=types.SimpleNamespace(wire_profile_id="legacy_medium", fit_profile_id="legacy_default", slot_width=None, slot_depth=None, tang_offset=None),
+        ),
+    )
 
     import fretboard.ui.streamlit_app
 
     importlib.reload(fretboard.ui.streamlit_app)
 
     assert any(name == "title" for name, _ in calls)
+
+
+

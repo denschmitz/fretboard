@@ -17,6 +17,9 @@ from build123d import (
 
 from fretboard.cad.defaults import CadDefaults
 from fretboard.cad.interface import CadBackend, ExportRequest
+from fretboard.domain.construction import resolve_construction
+from fretboard.domain.presets import load_profile_store
+from fretboard.domain.slotting import resolve_slotting
 from fretboard.geometry.inlays import InlayRecess, inlay_recesses, resolved_inlay_style
 from fretboard.geometry.outline import width_at_distance
 from fretboard.logging_utils import get_logger
@@ -27,11 +30,28 @@ from fretboard.music.scales import equal_temperament
 logger = get_logger(__name__)
 
 
+def _top_surface_apex_z(request: ExportRequest, defaults: CadDefaults) -> float:
+    construction = resolve_construction(request.spec)
+    return construction.fingerboard_thickness
+
+
+def _bottom_face_z(request: ExportRequest, defaults: CadDefaults) -> float:
+    construction = resolve_construction(request.spec)
+    top_surface_apex_z = _top_surface_apex_z(request, defaults)
+    return top_surface_apex_z - construction.fingerboard_thickness
+
+
+def _radius_cylinder_center_z(request: ExportRequest, defaults: CadDefaults) -> float:
+    top_surface_apex_z = _top_surface_apex_z(request, defaults)
+    return top_surface_apex_z - request.spec.geometry.fingerboard_radius
+
+
 def _board_length_mm(request: ExportRequest, defaults: CadDefaults) -> float:
+    construction = resolve_construction(request.spec)
     fret_positions = calculate_fret_positions(
         equal_temperament(), request.spec.geometry.scale_length, request.spec.geometry.num_frets
     )
-    return fret_positions[-1] + defaults.end_extension_mm
+    return fret_positions[-1] + construction.board_end_extension
 
 
 def _final_width_mm(request: ExportRequest, board_length_mm: float) -> float:
@@ -90,7 +110,8 @@ def build_inlay_cut_parts(
         cut_depth=defaults.inlay_depth_mm,
         octave_pair_offset_ratio=defaults.inlay_octave_pair_offset_ratio,
     )
-    top_surface_z = defaults.fingerboard_thickness_mm if top_surface_z is None else top_surface_z
+    construction = resolve_construction(request.spec)
+    top_surface_z = construction.fingerboard_thickness if top_surface_z is None else top_surface_z
 
     cut_parts = []
     for recess in recesses:
@@ -107,29 +128,30 @@ def build_fretboard_part(request: ExportRequest, defaults: CadDefaults | None = 
     logger.debug("Building fretboard part for %s", request.spec.name)
     final_width_mm = _final_width_mm(request, board_length_mm)
     blank_width_mm = _rectangular_blank_width_mm(final_width_mm, defaults, request)
-    thickness_mm = defaults.fingerboard_thickness_mm
+    construction = resolve_construction(request.spec)
+    wire_profiles, fit_profiles = load_profile_store()
+    slotting = resolve_slotting(request.spec, wire_profiles=wire_profiles, fit_profiles=fit_profiles)
+    thickness_mm = construction.fingerboard_thickness
+    bottom_face_z = _bottom_face_z(request, defaults)
+    top_surface_apex_z = _top_surface_apex_z(request, defaults)
+    radius_center_z = _radius_cylinder_center_z(request, defaults)
     radius_mm = request.spec.geometry.fingerboard_radius
 
-    blank = Box(
-        blank_width_mm,
-        board_length_mm,
-        thickness_mm,
-        align=(Align.CENTER, Align.MIN, Align.MIN),
-    )
+    blank = Pos(0, 0, bottom_face_z) * Box(blank_width_mm, board_length_mm, thickness_mm, align=(Align.CENTER, Align.MIN, Align.MIN))
 
-    cylinder = Pos(0, board_length_mm / 2, thickness_mm - radius_mm) * Cylinder(
+    cylinder = Pos(0, board_length_mm / 2, radius_center_z) * Cylinder(
         radius_mm,
         board_length_mm + defaults.cylinder_length_margin_mm,
         rotation=Rotation(90, 0, 0),
     )
     slotted_blank = blank & cylinder
 
-    inner_radius_mm = radius_mm - defaults.fret_slot_depth_mm
+    inner_radius_mm = radius_mm - slotting.resolved_slot_depth
     if inner_radius_mm <= 0:
-        logger.error("Invalid slot depth %s for radius %s", defaults.fret_slot_depth_mm, radius_mm)
-        raise ValueError("fret_slot_depth_mm must be smaller than the fingerboard radius")
+        logger.error("Invalid slot depth %s for radius %s", slotting.resolved_slot_depth, radius_mm)
+        raise ValueError("resolved slot depth must be smaller than the fingerboard radius")
 
-    inner_cylinder = Pos(0, board_length_mm / 2, thickness_mm - radius_mm) * Cylinder(
+    inner_cylinder = Pos(0, board_length_mm / 2, radius_center_z) * Cylinder(
         inner_radius_mm,
         board_length_mm + defaults.cylinder_length_margin_mm,
         rotation=Rotation(90, 0, 0),
@@ -143,7 +165,7 @@ def build_fretboard_part(request: ExportRequest, defaults: CadDefaults | None = 
         y_position_mm = fret_positions[fret_number]
         slot_band = Pos(0, y_position_mm, 0) * Box(
             blank_width_mm + 2.0,
-            defaults.fret_slot_width_mm,
+            slotting.resolved_slot_width,
             thickness_mm,
             align=(Align.CENTER, Align.CENTER, Align.MIN),
         )
@@ -155,13 +177,20 @@ def build_fretboard_part(request: ExportRequest, defaults: CadDefaults | None = 
         final_width_mm,
         board_length_mm,
         thickness_mm,
-    )
+    ).moved(Location(Vector(0, 0, bottom_face_z)))
     fretboard = slotted_blank & trim_prism
 
-    for inlay_cutter in build_inlay_cut_parts(request, defaults, top_surface_z=thickness_mm):
+    for inlay_cutter in build_inlay_cut_parts(request, defaults, top_surface_z=top_surface_apex_z):
         fretboard = fretboard - inlay_cutter
 
-    logger.debug("Built fretboard part length=%s width=%s thickness=%s", board_length_mm, final_width_mm, thickness_mm)
+    logger.debug(
+        "Built fretboard part length=%s width=%s thickness=%s top_apex_z=%s bottom_z=%s",
+        board_length_mm,
+        final_width_mm,
+        thickness_mm,
+        top_surface_apex_z,
+        bottom_face_z,
+    )
     return fretboard
 
 

@@ -1,17 +1,97 @@
 {
-  "version": 1,
+  "version": 2,
+  "wire_profiles": [
+    {
+      "id": "legacy_medium",
+      "name": "Legacy Medium Fretwire",
+      "tang_width": 0.58,
+      "tang_depth": 1.8,
+      "crown_width": 2.4,
+      "crown_height": 1.1,
+      "notes": "Compatibility profile matching the historical slot-width default."
+    },
+    {
+      "id": "medium_jumbo_nickel",
+      "name": "Medium Jumbo Nickel",
+      "tang_width": 0.6,
+      "tang_depth": 1.7,
+      "crown_width": 2.7,
+      "crown_height": 1.3,
+      "notes": "General-purpose medium jumbo reference wire."
+    }
+  ],
+  "fit_profiles": [
+    {
+      "id": "legacy_default",
+      "name": "Legacy Default Fit",
+      "slot_width_delta_from_tang": 0.0,
+      "slot_depth_delta_from_tang": 0.0,
+      "tang_measurement_basis": "compatibility",
+      "slot_cut_method": "saw",
+      "fret_installation_method": "press",
+      "tang_style": "straight",
+      "notes": "Compatibility profile matching the historical slot-depth default."
+    },
+    {
+      "id": "press_fit_standard",
+      "name": "Standard Press Fit",
+      "slot_width_delta_from_tang": 0.02,
+      "slot_depth_delta_from_tang": 0.15,
+      "tang_measurement_basis": "nominal",
+      "slot_cut_method": "saw",
+      "fret_installation_method": "press",
+      "tang_style": "barbed",
+      "notes": "Conservative production allowance for press-fit installation."
+    }
+  ],
   "presets": [
     {
       "id": "gibson_les_paul",
-      "name": "Gibson Les Paul",
+      "name": "Gibson Les Paul Standard '60s",
+      "units": "in",
+      "geometry": {
+        "scale_length": 24.75,
+        "num_frets": 22,
+        "num_strings": 6,
+        "fingerboard_width_at_nut": 1.69,
+        "fingerboard_width_at_end": 2.26,
+        "fingerboard_radius": 12.0
+      },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
+      },
+      "metadata": {
+        "fingerboard_material": "Rosewood",
+        "fret_material": "Nickel Silver",
+        "nut_material": "Graph Tech",
+        "inlay_material": "Acrylic",
+        "inlay_style": "Trapezoid"
+      }
+    },
+    {
+      "id": "gibson_les_paul_vintage",
+      "name": "Gibson Les Paul Standard '50s",
       "units": "in",
       "geometry": {
         "scale_length": 24.75,
         "num_frets": 22,
         "num_strings": 6,
         "fingerboard_width_at_nut": 1.695,
-        "fingerboard_width_at_12th_fret": 2.26,
+        "fingerboard_width_at_end": 2.26,
         "fingerboard_radius": 12.0
+      },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
       },
       "metadata": {
         "fingerboard_material": "Rosewood",
@@ -33,6 +113,14 @@
         "fingerboard_width_at_12th_fret": 2.165,
         "fingerboard_radius": 9.5
       },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
+      },
       "metadata": {
         "fingerboard_material": "Maple",
         "fret_material": "Nickel Silver",
@@ -52,6 +140,14 @@
         "fingerboard_width_at_nut": 1.65,
         "fingerboard_width_at_12th_fret": 2.2,
         "fingerboard_radius": 9.5
+      },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
       },
       "metadata": {
         "fingerboard_material": "Maple",
@@ -73,6 +169,14 @@
         "fingerboard_width_at_12th_fret": 2.245,
         "fingerboard_radius": 10.0
       },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "medium_jumbo_nickel",
+        "fit_profile_id": "press_fit_standard"
+      },
       "metadata": {
         "fingerboard_material": "Rosewood",
         "fret_material": "Nickel Silver",
@@ -92,6 +196,14 @@
         "fingerboard_width_at_nut": 1.692,
         "fingerboard_width_at_12th_fret": 2.283,
         "fingerboard_radius": 16.0
+      },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "medium_jumbo_nickel",
+        "fit_profile_id": "press_fit_standard"
       },
       "metadata": {
         "fingerboard_material": "Rosewood",
@@ -113,6 +225,14 @@
         "fingerboard_width_at_12th_fret": 2.24,
         "fingerboard_radius": 12.0
       },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
+      },
       "metadata": {
         "fingerboard_material": "Rosewood",
         "fret_material": "Nickel Silver",
@@ -132,6 +252,14 @@
         "fingerboard_width_at_nut": 1.63,
         "fingerboard_width_at_12th_fret": 1.93,
         "fingerboard_radius": 10.0
+      },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
       },
       "metadata": {
         "fingerboard_material": "Rosewood",
@@ -153,6 +281,14 @@
         "fingerboard_width_at_12th_fret": 2.125,
         "fingerboard_radius": 16.0
       },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
+      },
       "metadata": {
         "fingerboard_material": "Ebony",
         "fret_material": "Nickel Silver",
@@ -173,6 +309,14 @@
         "fingerboard_width_at_12th_fret": 2.218,
         "fingerboard_radius": 12.0
       },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
+      },
       "metadata": {
         "fingerboard_material": "Ebony",
         "fret_material": "Nickel Silver",
@@ -192,6 +336,14 @@
         "fingerboard_width_at_nut": 1.75,
         "fingerboard_width_at_12th_fret": 2.25,
         "fingerboard_radius": 15.0
+      },
+      "construction": {
+        "fingerboard_thickness": 0.25,
+        "board_end_extension": 0.472441
+      },
+      "slotting": {
+        "wire_profile_id": "legacy_medium",
+        "fit_profile_id": "legacy_default"
       },
       "metadata": {
         "fingerboard_material": "Ebony",

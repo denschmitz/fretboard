@@ -1,23 +1,25 @@
 # Requirement Traceability
 
+The following requirements have direct automated coverage in `tests/test_requirements_traceability.py`.
+
 - `FR-001`: `tests/test_requirements_traceability.py::test_fr_001_generate_output_writes_step_file`
 - `FR-002`: `tests/test_requirements_traceability.py::test_fr_002_generate_output_writes_manifest_with_resolved_spec`
 - `FR-003`: `tests/test_requirements_traceability.py::test_fr_003_internal_geometry_uses_millimeters`
 - `FR-004`: `tests/test_requirements_traceability.py::test_fr_004_invalid_required_inputs_are_rejected`
 - `FR-005`: `tests/test_requirements_traceability.py::test_fr_005_built_in_preset_store_has_required_shape`
 - `FR-006`: `tests/test_requirements_traceability.py::test_fr_006_preset_lookup_supports_id_and_name`
-- `FR-007`: `tests/test_requirements_traceability.py::test_fr_007_editable_fields_preload_geometry_units_and_metadata`
+- `FR-007`: `tests/test_requirements_traceability.py::test_fr_007_editable_fields_preload_geometry_units_and_all_editable_sections`
 - `FR-008`: `tests/test_requirements_traceability.py::test_fr_008_display_unit_conversion_preserves_modeled_geometry`
 - `FR-009`: `tests/test_requirements_traceability.py::test_fr_009_cli_overrides_use_selected_or_preset_units`
 - `FR-010`: `tests/test_requirements_traceability.py::test_fr_010_user_presets_are_separate_serialized_in_display_units_and_listed`
-- `FR-011`: `tests/test_requirements_traceability.py::test_fr_011_work_folder_resolution_precedence`
+- `FR-011`: `tests/test_requirements_traceability.py::test_fr_011_output_location_resolution_precedence`
 - `FR-012`: `tests/test_requirements_traceability.py::test_fr_012_width_at_half_scale_matches_specified_twelfth_fret_width`
 - `FR-013`: `tests/test_requirements_traceability.py::test_fr_013_board_length_extends_past_last_fret_by_default_extension`
 - `FR-014`: `tests/test_requirements_traceability.py::test_fr_014_slot_definitions_include_required_cut_fields`
-- `FR-015`: `tests/test_requirements_traceability.py::test_fr_015_cli_supports_list_save_and_generate_without_ui`
+- `FR-015`: `tests/test_requirements_traceability.py::test_fr_015_cli_supports_list_export_import_save_and_generate_without_ui`
 - `FR-016`: `tests/test_requirements_traceability.py::test_fr_016_streamlit_ui_separates_preset_context_from_editable_sections`
-- `FR-017`: `tests/test_requirements_traceability.py::test_fr_017_streamlit_ui_groups_core_geometry_and_metadata_inputs`
-- `FR-018`: `tests/test_requirements_traceability.py::test_fr_018_streamlit_ui_core_geometry_precedes_metadata`
+- `FR-017`: `tests/test_requirements_traceability.py::test_fr_017_streamlit_ui_groups_core_geometry_construction_slotting_and_metadata_inputs`
+- `FR-018`: `tests/test_requirements_traceability.py::test_fr_018_streamlit_ui_core_geometry_precedes_secondary_sections`
 - `FR-019`: `tests/test_requirements_traceability.py::test_fr_019_streamlit_ui_shows_preset_source_and_work_folder_in_separate_sections`
 - `FR-020`: `tests/test_requirements_traceability.py::test_fr_020_streamlit_ui_places_generate_with_core_geometry`
 - `FR-021`: `tests/test_requirements_traceability.py::test_fr_021_streamlit_ui_converts_display_state_when_units_change`
@@ -25,7 +27,6 @@
 - `FR-023`: `tests/test_requirements_traceability.py::test_fr_023_streamlit_ui_saves_user_preset_from_separate_section`
 - `FR-024`: `tests/test_requirements_traceability.py::test_fr_024_scale_utilities_support_equal_temperament_and_explicit_scales`
 - `FR-025`: `tests/test_requirements_traceability.py::test_fr_025_logging_supports_standard_levels_and_cli_configuration`
-
 - `FR-026`: `tests/test_requirements_traceability.py::test_fr_026_cli_exports_standalone_single_preset_json`
 - `FR-027`: `tests/test_requirements_traceability.py::test_fr_027_cli_imports_standalone_preset_into_user_store`
 - `FR-028`: `tests/test_requirements_traceability.py::test_fr_028_imported_presets_are_selectable_by_name`
@@ -40,3 +41,14 @@
 - `FR-037`: `tests/test_requirements_traceability.py::test_fr_037_inlay_cad_uses_circle_profile_and_subtractive_extrusion`
 - `FR-038`: `tests/test_requirements_traceability.py::test_fr_038_inlay_depth_is_five_mm_at_crown_apex`
 - `FR-039`: `tests/test_requirements_traceability.py::test_fr_039_inlay_profile_creation_is_separate_from_extrusion`
+- `FR-063`: `tests/test_requirements_traceability.py::test_fr_063_inconsistent_twelfth_and_end_widths_are_rejected`
+- `FR-064`: `tests/test_requirements_traceability.py::test_fr_005_built_in_preset_store_has_required_shape`
+- `FR-068A`: `tests/test_requirements_traceability.py::test_fr_068a_fingerboard_thickness_is_defined_from_bottom_to_radiused_apex`
+- `FR-068B`: `tests/test_requirements_traceability.py::test_fr_068b_cad_output_matches_resolved_centerline_apex_thickness`
+- `FR-068C`: `tests/test_requirements_traceability.py::test_fr_068c_centerline_apex_thickness_definition_is_radius_independent`
+- `FR-075`: `tests/test_requirements_traceability.py::test_fr_075_slotting_override_precedence_is_deterministic`
+- `FR-077`: `tests/test_requirements_traceability.py::test_fr_077_slotting_resolves_from_selected_profiles`
+- `FR-085`: `tests/test_requirements_traceability.py::test_fr_085_manifest_includes_resolved_slotting_information`
+- `FR-087`: `tests/test_requirements_traceability.py::test_fr_087_legacy_preset_is_migrated_or_warned_cleanly`
+
+Requirements not listed above do not yet have a dedicated traceability entry in this document.

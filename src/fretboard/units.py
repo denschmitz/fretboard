@@ -6,16 +6,24 @@ DIMENSION_FIELDS = {
     "scale_length",
     "fingerboard_width_at_nut",
     "fingerboard_width_at_12th_fret",
+    "fingerboard_width_at_end",
     "fingerboard_radius",
+    "fingerboard_radius_end",
+    "fingerboard_thickness_at_nut",
+    "fingerboard_thickness_at_end",
+    "fingerboard_thickness",
+    "board_end_extension",
+    "edge_fillet",
+    "slot_width",
+    "slot_depth",
+    "tang_offset",
     "fingerboard_width_at_scale",
 }
-
 
 
 def validate_units(units: str) -> None:
     if units not in SUPPORTED_UNITS:
         raise ValueError(f"Unsupported units: {units}")
-
 
 
 def to_internal_length(value: float, units: str) -> float:
@@ -25,13 +33,11 @@ def to_internal_length(value: float, units: str) -> float:
     return float(value) * INCH_TO_MM
 
 
-
 def from_internal_length(value_mm: float, units: str) -> float:
     validate_units(units)
     if units == INTERNAL_UNITS:
         return float(value_mm)
     return float(value_mm) / INCH_TO_MM
-
 
 
 def convert_dimension_dict(data: dict, from_units: str, to_units: str) -> dict:
@@ -46,7 +52,6 @@ def convert_dimension_dict(data: dict, from_units: str, to_units: str) -> dict:
             internal_value = to_internal_length(converted[field], from_units)
             converted[field] = from_internal_length(internal_value, to_units)
     return converted
-
 
 
 def round_display(value: float) -> float:

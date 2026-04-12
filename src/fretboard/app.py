@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fretboard.cad.interface import ExportRequest
+from fretboard.domain.construction import resolve_construction
 from fretboard.cad.step_export import StepExportBackend
 from fretboard.domain.models import FretboardSpec
 from fretboard.domain.presets import (
@@ -8,8 +9,10 @@ from fretboard.domain.presets import (
     export_preset,
     import_user_preset,
     list_presets,
+    load_profile_store,
     save_user_preset,
 )
+from fretboard.domain.slotting import resolve_slotting
 from fretboard.logging_utils import get_logger
 from fretboard.outputs.files import default_step_output_path, resolve_work_folder, write_design_output
 from fretboard.outputs.manifest import build_manifest
@@ -25,7 +28,6 @@ def available_presets(user_path: Path | None = None):
     return presets
 
 
-
 def resolve_spec(
     preset: str,
     overrides: dict | None = None,
@@ -38,22 +40,26 @@ def resolve_spec(
     return spec
 
 
-
 def editable_fields_from_preset(
     preset: str,
     *,
     user_path: Path | None = None,
 ) -> dict:
     spec = resolve_spec(preset, user_path=user_path)
+    construction = resolve_construction(spec)
+    wire_profiles, fit_profiles = load_profile_store(user_path=user_path)
+    resolved_slotting = resolve_slotting(spec, wire_profiles=wire_profiles, fit_profiles=fit_profiles)
     geometry = {
-        field: round_display(from_internal_length(getattr(spec.geometry, field), spec.units))
-        for field in spec.geometry.__dict__
-        if field in DIMENSION_FIELDS
+        field: round_display(from_internal_length(value, spec.units)) if field in DIMENSION_FIELDS and value is not None else value
+        for field, value in spec.geometry.__dict__.items()
     }
-    counts = {
-        field: getattr(spec.geometry, field)
-        for field in spec.geometry.__dict__
-        if field not in DIMENSION_FIELDS
+    construction_fields = {
+        field: round_display(from_internal_length(value, spec.units)) if field in DIMENSION_FIELDS and value is not None else value
+        for field, value in construction.__dict__.items()
+    }
+    slotting = {
+        field: round_display(from_internal_length(value, spec.units)) if field in DIMENSION_FIELDS and value is not None else value
+        for field, value in spec.slotting.__dict__.items()
     }
     return {
         "id": spec.id,
@@ -61,10 +67,18 @@ def editable_fields_from_preset(
         "name": spec.name,
         "units": spec.units,
         **geometry,
-        **counts,
+        **construction_fields,
+        **slotting,
         **spec.metadata.__dict__,
+        "resolved_slot_width": round_display(from_internal_length(resolved_slotting.resolved_slot_width, spec.units)),
+        "resolved_slot_depth": round_display(from_internal_length(resolved_slotting.resolved_slot_depth, spec.units)),
+        "resolved_tang_offset": round_display(from_internal_length(resolved_slotting.resolved_tang_offset, spec.units)),
+        "resolved_wire_profile_id": resolved_slotting.wire_profile_id,
+        "resolved_fit_profile_id": resolved_slotting.fit_profile_id,
+        "slot_width_source": resolved_slotting.slot_width_source,
+        "slot_depth_source": resolved_slotting.slot_depth_source,
+        "tang_offset_source": resolved_slotting.tang_offset_source,
     }
-
 
 
 def convert_display_fields(fields: dict, new_units: str) -> dict:
@@ -72,11 +86,10 @@ def convert_display_fields(fields: dict, new_units: str) -> dict:
     geometry = {field: fields[field] for field in DIMENSION_FIELDS if field in fields}
     converted = convert_dimension_dict(geometry, current_units, new_units)
     updated = fields.copy()
-    updated.update({field: round_display(value) for field, value in converted.items()})
+    updated.update({field: round_display(value) if value is not None else None for field, value in converted.items()})
     updated["units"] = new_units
     logger.debug("Converted display fields from %s to %s", current_units, new_units)
     return updated
-
 
 
 def rename_spec(spec: FretboardSpec, new_name: str) -> FretboardSpec:
@@ -85,10 +98,16 @@ def rename_spec(spec: FretboardSpec, new_name: str) -> FretboardSpec:
         name=new_name,
         units=spec.units,
         geometry=spec.geometry,
+        construction=spec.construction,
+        slotting=spec.slotting,
         metadata=spec.metadata,
         source=spec.source,
     )
 
+
+def available_slotting_profiles(*, user_path: Path | None = None) -> dict[str, list]:
+    wire_profiles, fit_profiles = load_profile_store(user_path=user_path)
+    return {"wire_profiles": wire_profiles, "fit_profiles": fit_profiles}
 
 
 def save_named_user_preset(
@@ -103,7 +122,6 @@ def save_named_user_preset(
     return save_user_preset(renamed_spec, preset_name, user_path=user_path, overwrite=overwrite)
 
 
-
 def export_named_preset(
     preset: str,
     output_path: Path,
@@ -112,7 +130,6 @@ def export_named_preset(
 ) -> Path:
     logger.info("Exporting preset %s", preset)
     return export_preset(preset, output_path, user_path=user_path)
-
 
 
 def import_preset_file(
@@ -125,10 +142,8 @@ def import_preset_file(
     return import_user_preset(preset_path, user_path=user_path, overwrite=overwrite)
 
 
-
 def build_design_summary(spec: FretboardSpec) -> dict:
     return build_manifest(spec)
-
 
 
 def generate_output(
@@ -145,7 +160,6 @@ def generate_output(
     write_design_output(summary, step_path)
     logger.info("Generated STEP output at %s", step_path)
     return step_path
-
 
 
 def resolved_work_folder(work_folder: Path | None = None) -> Path:

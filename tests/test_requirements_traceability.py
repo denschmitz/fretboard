@@ -13,6 +13,7 @@ import pytest
 from fretboard import cli
 from fretboard.app import (
     available_presets,
+    build_design_summary,
     convert_display_fields,
     editable_fields_from_preset,
     export_named_preset,
@@ -22,10 +23,19 @@ from fretboard.app import (
     save_named_user_preset,
 )
 from fretboard.cad import build123d_backend
-from fretboard.cad.build123d_backend import _board_length_mm, _build_dot_inlay_profile, _extrude_inlay_profile, build_inlay_cut_parts
+from fretboard.cad.build123d_backend import (
+    _board_length_mm,
+    _bottom_face_z,
+    _build_dot_inlay_profile,
+    _extrude_inlay_profile,
+    _top_surface_apex_z,
+    build_fretboard_part,
+    build_inlay_cut_parts,
+)
 from fretboard.cad.defaults import CadDefaults
 from fretboard.cad.interface import ExportRequest
-from fretboard.domain.presets import PRESET_FILE_VERSION, default_presets_path
+from fretboard.domain.presets import PRESET_FILE_VERSION, default_presets_path, load_single_preset
+from fretboard.domain.slotting import resolve_slotting
 from fretboard.errors import PresetError, ValidationError
 from fretboard.geometry.inlays import inlay_recesses, marker_center_y, resolved_inlay_style
 from fretboard.geometry.outline import width_at_distance
@@ -68,7 +78,7 @@ def test_fr_002_generate_output_writes_manifest_with_resolved_spec() -> None:
 
         assert manifest_path.exists()
         assert payload["output_type"] == "fretboard_design_manifest"
-        assert payload["spec"]["name"] == "Gibson Les Paul"
+        assert payload["spec"]["name"] == "Gibson Les Paul Standard '60s"
         assert payload["spec"]["units"] == "in"
         assert payload["spec"]["internal_units"] == "mm"
         assert payload["spec"]["slot_count"] == spec.geometry.num_frets
@@ -80,7 +90,7 @@ def test_fr_002_generate_output_writes_manifest_with_resolved_spec() -> None:
 def test_fr_003_internal_geometry_uses_millimeters() -> None:
     spec = resolve_spec("gibson_les_paul")
     assert math.isclose(spec.geometry.scale_length, 628.65, rel_tol=0, abs_tol=1e-6)
-    assert math.isclose(spec.geometry.fingerboard_width_at_nut, 43.053, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(spec.geometry.fingerboard_width_at_nut, 42.926, rel_tol=0, abs_tol=1e-6)
 
 
 
@@ -106,22 +116,26 @@ def test_fr_005_built_in_preset_store_has_required_shape() -> None:
 
     assert payload["version"] == PRESET_FILE_VERSION
     assert isinstance(payload["presets"], list)
-    assert {"id", "name", "units", "geometry", "metadata"}.issubset(first)
+    assert isinstance(payload["wire_profiles"], list)
+    assert isinstance(payload["fit_profiles"], list)
+    assert {"id", "name", "units", "geometry", "construction", "slotting", "metadata"}.issubset(first)
 
 
 
 def test_fr_006_preset_lookup_supports_id_and_name() -> None:
-    assert resolve_spec("gibson_les_paul").name == "Gibson Les Paul"
-    assert resolve_spec("Gibson Les Paul").id == "gibson_les_paul"
+    assert resolve_spec("gibson_les_paul").name == "Gibson Les Paul Standard '60s"
+    assert resolve_spec("Gibson Les Paul Standard '60s").id == "gibson_les_paul"
 
 
 
-def test_fr_007_editable_fields_preload_geometry_units_and_metadata() -> None:
+def test_fr_007_editable_fields_preload_geometry_units_and_all_editable_sections() -> None:
     fields = editable_fields_from_preset("gibson_les_paul")
 
     assert fields["units"] == "in"
     assert fields["scale_length"] == 24.75
     assert fields["num_frets"] == 22
+    assert fields["fingerboard_thickness"] == 0.25
+    assert fields["wire_profile_id"] == "legacy_medium"
     assert fields["fingerboard_material"] == "Rosewood"
     assert fields["id"] == "gibson_les_paul"
     assert fields["source"] == "built_in"
@@ -143,6 +157,7 @@ def test_fr_008_display_unit_conversion_preserves_modeled_geometry() -> None:
     assert converted["units"] == "mm"
     assert math.isclose(spec.geometry.scale_length, 628.65, rel_tol=0, abs_tol=1e-6)
     assert math.isclose(spec.geometry.fingerboard_radius, 304.8, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(converted["fingerboard_thickness"], 6.35, rel_tol=0, abs_tol=1e-6)
 
 
 
@@ -173,6 +188,8 @@ def test_fr_010_user_presets_are_separate_serialized_in_display_units_and_listed
         assert saved.source == "user"
         assert payload["presets"][0]["units"] == "mm"
         assert payload["presets"][0]["geometry"]["scale_length"] == 635.0
+        assert payload["presets"][0]["construction"]["fingerboard_thickness"] == 6.35
+        assert payload["presets"][0]["slotting"]["wire_profile_id"] == "legacy_medium"
         assert "My Custom LP" in names
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -236,7 +253,7 @@ def test_fr_013_board_length_extends_past_last_fret_by_default_extension() -> No
     board_length = _board_length_mm(ExportRequest(spec=spec, output_path=Path("unused.step")), defaults)
     fret_positions = calculate_fret_positions(equal_temperament(), spec.geometry.scale_length, spec.geometry.num_frets)
 
-    assert math.isclose(board_length, fret_positions[-1] + defaults.end_extension_mm, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(board_length, fret_positions[-1] + 12.000001, rel_tol=0, abs_tol=1e-5)
 
 
 
@@ -262,7 +279,7 @@ def test_fr_015_cli_supports_list_export_import_save_and_generate_without_ui(cap
 
         monkeypatch.setattr(sys, "argv", ["fretboard", "list-presets"])
         cli.main()
-        assert "Gibson Les Paul" in capsys.readouterr().out
+        assert "Gibson Les Paul Standard '60s" in capsys.readouterr().out
 
         monkeypatch.setattr(
             sys,
@@ -395,32 +412,69 @@ def _render_streamlit_ui(monkeypatch, *, button_values=None, save_name=""):
             calls.append(("button", label))
             return (button_values or {}).get(label, False)
 
+        def checkbox(self, label, key=None):
+            if key is not None:
+                self.session_state.setdefault(key, False)
+                value = self.session_state[key]
+            else:
+                value = False
+            calls.append(("checkbox", label))
+            return value
+
         def success(self, value):
             calls.append(("success", value))
+
+        def error(self, value):
+            calls.append(("error", value))
 
     fake_streamlit = FakeStreamlit()
     monkeypatch.setitem(sys.modules, "streamlit", fake_streamlit)
     monkeypatch.setattr(
         "fretboard.app.available_presets",
-        lambda user_path=None: [types.SimpleNamespace(name="Gibson Les Paul")],
+        lambda user_path=None: [types.SimpleNamespace(name="Gibson Les Paul Standard '60s")],
+    )
+    monkeypatch.setattr(
+        "fretboard.app.available_slotting_profiles",
+        lambda user_path=None: {
+            "wire_profiles": [
+                types.SimpleNamespace(id="legacy_medium", tang_width=0.58, tang_depth=1.8),
+                types.SimpleNamespace(id="medium_jumbo_nickel", tang_width=0.6, tang_depth=1.7),
+            ],
+            "fit_profiles": [
+                types.SimpleNamespace(id="legacy_default", slot_width_delta_from_tang=0.0, slot_depth_delta_from_tang=0.0),
+                types.SimpleNamespace(id="press_fit_standard", slot_width_delta_from_tang=0.02, slot_depth_delta_from_tang=0.15),
+            ],
+        },
     )
     monkeypatch.setattr(
         "fretboard.app.editable_fields_from_preset",
         lambda preset, user_path=None: {
             "source": "built_in",
-            "name": "Gibson Les Paul",
+            "name": "Gibson Les Paul Standard '60s",
             "units": "in",
             "scale_length": 24.75,
             "num_frets": 22,
             "num_strings": 6,
-            "fingerboard_width_at_nut": 1.695,
-            "fingerboard_width_at_12th_fret": 2.26,
+            "fingerboard_width_at_nut": 1.69,
+            "fingerboard_width_at_12th_fret": 2.075932,
+            "fingerboard_width_at_end": 2.26,
             "fingerboard_radius": 12.0,
+            "fingerboard_thickness": 0.25,
+            "board_end_extension": 0.472441,
+            "edge_fillet": 0.0,
+            "wire_profile_id": "legacy_medium",
+            "fit_profile_id": "legacy_default",
+            "slot_width": None,
+            "slot_depth": None,
+            "tang_offset": None,
             "fingerboard_material": "Rosewood",
             "fret_material": "Nickel Silver",
             "nut_material": "Graph Tech",
             "inlay_material": "Acrylic",
             "inlay_style": "Trapezoid",
+            "display_notes": None,
+            "era": None,
+            "label": None,
             "id": "gibson_les_paul",
         },
     )
@@ -431,16 +485,29 @@ def _render_streamlit_ui(monkeypatch, *, button_values=None, save_name=""):
             **fields,
             "units": new_units,
             "scale_length": 628.65,
-            "fingerboard_width_at_nut": 43.053,
-            "fingerboard_width_at_12th_fret": 57.404,
+            "fingerboard_width_at_nut": 42.926,
+            "fingerboard_width_at_12th_fret": 52.728660209214,
+            "fingerboard_width_at_end": 57.404,
             "fingerboard_radius": 304.8,
+            "fingerboard_thickness": 6.35,
+            "board_end_extension": 12.0,
         }
 
     monkeypatch.setattr("fretboard.app.convert_display_fields", _convert)
     monkeypatch.setattr("fretboard.app.resolved_work_folder", lambda work_folder=None: Path("C:/tmp/work"))
     monkeypatch.setattr(
         "fretboard.app.resolve_spec",
-        lambda preset, overrides=None, user_path=None: types.SimpleNamespace(name="Gibson Les Paul"),
+        lambda preset, overrides=None, user_path=None: types.SimpleNamespace(
+            name="Gibson Les Paul Standard '60s",
+            units=(overrides or {}).get("units", "in"),
+            slotting=types.SimpleNamespace(
+                wire_profile_id=(overrides or {}).get("wire_profile_id", "legacy_medium"),
+                fit_profile_id=(overrides or {}).get("fit_profile_id", "legacy_default"),
+                slot_width=(overrides or {}).get("slot_width"),
+                slot_depth=(overrides or {}).get("slot_depth"),
+                tang_offset=(overrides or {}).get("tang_offset"),
+            ),
+        ),
     )
     monkeypatch.setattr(
         "fretboard.app.generate_output",
@@ -466,22 +533,26 @@ def test_fr_016_streamlit_ui_separates_preset_context_from_editable_sections(mon
 
 
 
-def test_fr_017_streamlit_ui_groups_core_geometry_and_metadata_inputs(monkeypatch) -> None:
+def test_fr_017_streamlit_ui_groups_core_geometry_construction_slotting_and_metadata_inputs(monkeypatch) -> None:
     _, calls, _, _, _ = _render_streamlit_ui(monkeypatch)
 
     subheaders = [value for kind, value in calls if kind == "subheader"]
     assert "Core Geometry" in subheaders
+    assert "Construction" in subheaders
+    assert "Slotting" in subheaders
     assert "Metadata" in subheaders
     assert "User Preset" in subheaders
 
 
 
-def test_fr_018_streamlit_ui_core_geometry_precedes_metadata(monkeypatch) -> None:
+def test_fr_018_streamlit_ui_core_geometry_precedes_secondary_sections(monkeypatch) -> None:
     _, calls, _, _, _ = _render_streamlit_ui(monkeypatch)
 
     sequence = [value for kind, value in calls if kind in {"subheader", "number_input"}]
     assert sequence.index("Core Geometry") < sequence.index("Scale Length")
-    assert sequence.index("Fingerboard Radius") < sequence.index("Metadata")
+    assert sequence.index("Fingerboard Radius") < sequence.index("Construction")
+    assert sequence.index("Construction") < sequence.index("Slotting")
+    assert sequence.index("Slotting") < sequence.index("Metadata")
 
 
 
@@ -503,7 +574,7 @@ def test_fr_020_streamlit_ui_places_generate_with_core_geometry(monkeypatch) -> 
 
     sequence = [value for kind, value in calls if kind in {"subheader", "button"}]
     assert sequence.index("Core Geometry") < sequence.index("Generate")
-    assert sequence.index("Generate") < sequence.index("Metadata")
+    assert sequence.index("Generate") < sequence.index("Construction")
 
 
 
@@ -520,8 +591,10 @@ def test_fr_021_streamlit_ui_converts_display_state_when_units_change(monkeypatc
 def test_fr_022_streamlit_ui_preloads_editable_fields_into_session_state(monkeypatch) -> None:
     fake_streamlit, _, _, _, _ = _render_streamlit_ui(monkeypatch)
 
-    assert fake_streamlit.session_state["fb_name"] == "Gibson Les Paul"
+    assert fake_streamlit.session_state["fb_name"] == "Gibson Les Paul Standard '60s"
     assert fake_streamlit.session_state["fb_num_frets"] == 22
+    assert fake_streamlit.session_state["fb_fingerboard_thickness"] == 6.35
+    assert fake_streamlit.session_state["fb_wire_profile_id"] == "legacy_medium"
     assert fake_streamlit.session_state["fb_fingerboard_material"] == "Rosewood"
     assert fake_streamlit.session_state["fb_inlay_style"] == "Trapezoid"
 
@@ -537,7 +610,7 @@ def test_fr_023_streamlit_ui_saves_user_preset_from_separate_section(monkeypatch
     sequence = [value for kind, value in calls if kind in {"subheader", "button"}]
     assert sequence.index("Metadata") < sequence.index("User Preset")
     assert sequence.index("User Preset") < sequence.index("Save User Preset")
-    assert save_calls == [("Gibson Les Paul", "Stage LP", True)]
+    assert save_calls == [("Gibson Les Paul Standard '60s", "Stage LP", True)]
     assert generate_calls == []
 
 
@@ -589,7 +662,7 @@ def test_fr_026_cli_exports_standalone_single_preset_json() -> None:
         payload = json.loads(export_path.read_text())
 
         assert payload["id"] == "gibson_les_paul"
-        assert payload["name"] == "Gibson Les Paul"
+        assert payload["name"] == "Gibson Les Paul Standard '60s"
         assert payload["units"] == "in"
         assert "geometry" in payload
         assert "metadata" in payload
@@ -608,6 +681,12 @@ def test_fr_027_cli_imports_standalone_preset_into_user_store() -> None:
         payload["id"] = "imported_workshop_lp"
         payload["units"] = "mm"
         payload["geometry"]["scale_length"] = 635.0
+        payload["geometry"]["fingerboard_width_at_nut"] = 42.926
+        payload["geometry"]["fingerboard_width_at_12th_fret"] = 52.728660209214
+        payload["geometry"]["fingerboard_radius"] = 304.8
+        payload["construction"]["fingerboard_thickness"] = 6.35
+        payload["slotting"]["wire_profile_id"] = "medium_jumbo_nickel"
+        payload["slotting"]["fit_profile_id"] = "press_fit_standard"
         export_path.write_text(json.dumps(payload, indent=2) + "\n")
 
         imported = import_preset_file(export_path, user_path=user_path)
@@ -616,6 +695,7 @@ def test_fr_027_cli_imports_standalone_preset_into_user_store() -> None:
         assert imported.name == "Imported Workshop LP"
         assert store["presets"][0]["name"] == "Imported Workshop LP"
         assert store["presets"][0]["units"] == "mm"
+        assert store["presets"][0]["slotting"]["wire_profile_id"] == "medium_jumbo_nickel"
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -656,7 +736,7 @@ def test_fr_029_cli_lists_all_available_preset_names(capsys, monkeypatch) -> Non
         cli.main()
         lines = [line.strip() for line in capsys.readouterr().out.splitlines() if line.strip()]
 
-        assert "Gibson Les Paul" in lines
+        assert "Gibson Les Paul Standard '60s" in lines
         assert "Listed Imported LP" in lines
         assert all("\t" not in line for line in lines)
     finally:
@@ -696,7 +776,7 @@ def test_fr_031_standalone_preset_json_contains_recreation_fields() -> None:
         export_named_preset("gibson_les_paul", export_path)
         payload = json.loads(export_path.read_text())
 
-        assert set(payload) == {"id", "name", "units", "geometry", "metadata"}
+        assert set(payload) == {"id", "name", "units", "geometry", "construction", "slotting", "metadata"}
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -711,6 +791,109 @@ def test_fr_032_imported_preset_json_is_validated() -> None:
             import_preset_file(invalid_path, user_path=temp_dir / "user_presets.json")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_fr_075_slotting_override_precedence_is_deterministic() -> None:
+    spec = resolve_spec(
+        "gibson_les_paul",
+        overrides={"units": "mm", "slot_width": 0.61, "slot_depth": 1.95, "tang_offset": 0.05},
+    )
+    resolved = resolve_slotting(spec)
+
+    assert math.isclose(resolved.resolved_slot_width, 0.61, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(resolved.resolved_slot_depth, 1.95, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(resolved.resolved_tang_offset, 0.05, rel_tol=0, abs_tol=1e-6)
+    assert resolved.slot_width_source == "override"
+    assert resolved.slot_depth_source == "override"
+
+
+def test_fr_077_slotting_resolves_from_selected_profiles() -> None:
+    spec = resolve_spec("prs_custom_24")
+    resolved = resolve_slotting(spec)
+
+    assert resolved.wire_profile_id == "medium_jumbo_nickel"
+    assert resolved.fit_profile_id == "press_fit_standard"
+    assert math.isclose(resolved.resolved_slot_width, 0.62, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(resolved.resolved_slot_depth, 1.85, rel_tol=0, abs_tol=1e-6)
+    assert resolved.slot_width_source == "profile"
+    assert resolved.slot_depth_source == "profile"
+
+
+def test_fr_085_manifest_includes_resolved_slotting_information() -> None:
+    spec = resolve_spec("gibson_les_paul")
+    manifest = build_design_summary(spec)
+
+    assert manifest["slotting"]["wire_profile_id"] == "legacy_medium"
+    assert manifest["slotting"]["fit_profile_id"] == "legacy_default"
+    assert manifest["slotting"]["slot_width_source"] == "profile"
+    assert manifest["slotting"]["slot_depth_source"] == "profile"
+    assert math.isclose(manifest["slotting_mm"]["resolved_slot_width"], 0.58, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(manifest["slotting_mm"]["resolved_slot_depth"], 1.8, rel_tol=0, abs_tol=1e-6)
+
+
+def test_fr_087_legacy_preset_is_migrated_or_warned_cleanly(caplog) -> None:
+    temp_dir = _make_workspace_temp_dir()
+    try:
+        legacy_path = temp_dir / "legacy.json"
+        legacy_path.write_text(
+            json.dumps(
+                {
+                    "id": "legacy_lp",
+                    "name": "Legacy LP",
+                    "units": "in",
+                    "geometry": {
+                        "scale_length": 24.75,
+                        "num_frets": 22,
+                        "num_strings": 6,
+                        "fingerboard_width_at_nut": 1.69,
+                        "fingerboard_width_at_12th_fret": 2.075932,
+                        "fingerboard_radius": 12.0
+                    },
+                    "metadata": {"fingerboard_material": "Rosewood"}
+                },
+                indent=2
+            )
+            + "\n"
+        )
+
+        preset = load_single_preset(legacy_path, user_path=temp_dir / "user_presets.json")
+
+        assert preset.construction.fingerboard_thickness == CadDefaults().compatibility_fingerboard_thickness_mm
+        assert any("Migrated legacy preset" in record.message for record in caplog.records)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_fr_068a_fingerboard_thickness_is_defined_from_bottom_to_radiused_apex() -> None:
+    spec = resolve_spec("gibson_les_paul")
+    request = ExportRequest(spec=spec, output_path=Path("unused.step"))
+    defaults = CadDefaults()
+
+    assert math.isclose(_bottom_face_z(request, defaults), 0.0, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(_top_surface_apex_z(request, defaults), 6.35, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(_top_surface_apex_z(request, defaults) - _bottom_face_z(request, defaults), 6.35, rel_tol=0, abs_tol=1e-6)
+
+
+def test_fr_068b_cad_output_matches_resolved_centerline_apex_thickness() -> None:
+    spec = resolve_spec("gibson_les_paul")
+    part = build_fretboard_part(ExportRequest(spec=spec, output_path=Path("unused.step")))
+    bbox = part.bounding_box()
+
+    assert math.isclose(bbox.min.Z, 0.0, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(bbox.max.Z, 6.35, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(bbox.max.Z - bbox.min.Z, 6.35, rel_tol=0, abs_tol=1e-6)
+
+
+def test_fr_068c_centerline_apex_thickness_definition_is_radius_independent() -> None:
+    spec = resolve_spec(
+        "gibson_les_paul",
+        overrides={"units": "mm", "fingerboard_radius": 254.0, "fingerboard_thickness": 7.5},
+    )
+    part = build_fretboard_part(ExportRequest(spec=spec, output_path=Path("unused.step")))
+    bbox = part.bounding_box()
+
+    assert math.isclose(bbox.min.Z, 0.0, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(bbox.max.Z - bbox.min.Z, 7.5, rel_tol=0, abs_tol=1e-6)
 
 
 
@@ -810,3 +993,27 @@ def test_fr_039_inlay_profile_creation_is_separate_from_extrusion(monkeypatch) -
     extrude_calls = [call for call in calls if call[0] == "extrude"]
     assert len(profile_calls) == len(extrude_calls) == len(cut_parts)
     assert all(call[1].startswith("profile-") for call in extrude_calls)
+
+
+
+def test_fr_063_inconsistent_twelfth_and_end_widths_are_rejected() -> None:
+    with pytest.raises(ValidationError):
+        resolve_spec(
+            "gibson_les_paul",
+            overrides={
+                "units": "in",
+                "fingerboard_width_at_12th_fret": 2.0,
+                "fingerboard_width_at_end": 2.26,
+            },
+        )
+
+
+def test_preset_with_end_width_only_resolves_twelfth_width() -> None:
+    spec = resolve_spec("gibson_les_paul")
+    assert math.isclose(spec.geometry.fingerboard_width_at_end, 57.404, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(spec.geometry.fingerboard_width_at_12th_fret, 52.728660209214, rel_tol=0, abs_tol=1e-6)
+
+
+
+
+

@@ -28,8 +28,9 @@ That setup makes the package importable from the repo checkout, keeps the enviro
 ## Current Capabilities
 
 - Versioned JSON presets with built-in and user-defined entries
+- Built-in wire-profile and fit-profile stores for slotting resolution
 - Internal geometric calculations in millimeters with user-facing inch or millimeter display units
-- Preset-driven parameter editing with save-as user preset support
+- Preset-driven editing across geometry, construction, slotting, and metadata with save-as user preset support
 - Scripted STEP generation through a `build123d` backend
 - Dot inlay recess generation with alpha fallback from non-dot preset styles
 - Sidecar JSON manifest written alongside each generated STEP file
@@ -58,9 +59,13 @@ Each preset record contains:
 - `name`
 - `units`
 - `geometry`
+- `construction`
+- `slotting`
 - `metadata`
 
-Preset `units` are treated as preferred display units. Internally, all geometry is converted to millimeters.
+The built-in preset store also contains top-level `wire_profiles` and `fit_profiles` lists used to resolve fret slot dimensions from profile selections.
+
+Preset `units` are treated as preferred display units. Internally, preset geometry, construction, and slotting dimensions are converted to millimeters.
 
 ## Output
 
@@ -113,6 +118,12 @@ Generate with overrides:
 fretboard generate --preset gibson_les_paul --units mm --num-frets 24 --scale-length 635 --work-folder artifacts
 ```
 
+Generate with explicit slotting selections and overrides:
+
+```powershell
+fretboard generate --preset gibson_les_paul --wire-profile-id medium_jumbo_nickel --fit-profile-id press_fit_standard --slot-width 0.62 --slot-depth 1.9 --work-folder artifacts
+```
+
 ## Streamlit UI
 
 The current UI is implemented in [streamlit_app.py](C:/Data/dev/fretboard/src/fretboard/ui/streamlit_app.py).
@@ -134,7 +145,9 @@ The UI supports:
 - selecting a preset from a dropdown
 - preloading all editable parameters from the selected preset
 - switching display units between inches and millimeters with numeric conversion
-- editing any current geometry or metadata field
+- editing geometry, construction, slotting, and metadata fields in separate sections
+- selecting wire and fit profiles and previewing resolved slot dimensions
+- enabling manual slot width, slot depth, and tang offset overrides for advanced cases
 - saving the current values as a user preset
 - generating a STEP file into the resolved work folder
 

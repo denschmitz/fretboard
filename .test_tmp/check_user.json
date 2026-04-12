@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "imported_lp",
+      "name": "Imported LP",
+      "units": "mm",
+      "geometry": {
+        "scale_length": 635.0,
+        "num_frets": 22,
+        "num_strings": 6,
+        "fingerboard_width_at_nut": 42.926,
+        "fingerboard_width_at_12th_fret": 52.72866,
+        "fingerboard_radius": 304.8
+      },
+      "metadata": {
+        "fingerboard_material": "Rosewood",
+        "fret_material": "Nickel Silver",
+        "nut_material": "Graph Tech",
+        "inlay_material": "Acrylic",
+        "inlay_style": "Trapezoid"
+      }
+    }
+  ]
+}
